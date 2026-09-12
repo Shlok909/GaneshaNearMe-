@@ -1,0 +1,128 @@
+import { test as base, expect, type Page } from "@playwright/test";
+
+import { installGoogleMapsDouble } from "./google-maps-double";
+
+export const test = base.extend<{ browserErrors: string[] }>({
+  browserErrors: [
+    async ({ page }, use) => {
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(error.message));
+      page.on("console", (message) => {
+        if (message.type() === "error") errors.push(message.text());
+      });
+      await page.addInitScript(installGoogleMapsDouble);
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, "share", {
+          configurable: true,
+          value: undefined,
+        });
+      });
+      await use(errors);
+      expect(
+        errors,
+        "No browser exceptions, hydration, React or Maps integration errors",
+      ).toEqual([]);
+    },
+    { auto: true },
+  ],
+});
+export { expect };
+
+export const photo = {
+  name: "ganapati.png",
+  mimeType: "image/png",
+  buffer: Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a5V8AAAAASUVORK5CYII=",
+    "base64",
+  ),
+};
+export async function readyMap(page: Page) {
+  await expect(page.locator('[data-map-status="ready"]').first()).toBeVisible();
+}
+export async function fillSubmission(page: Page, name: string) {
+  await page.goto("/add");
+  await page.getByLabel("Mandal Name").fill(name);
+  await page
+    .getByLabel("Exact Location", { exact: true })
+    .fill("21.1458,79.0882");
+  await page.getByLabel("Your Name").fill("Meera Joshi");
+  await page.getByRole("radio", { name: "Volunteer", exact: true }).check();
+  await page.getByLabel("Organizer / Mandal Contact").fill("+91 98765 43210");
+  await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
+  await page.locator('input[name="ganapati-photos"]').setInputFiles(photo);
+  await page
+    .locator('input[name="decoration-photos"]')
+    .setInputFiles({ ...photo, name: "decoration.png" });
+}
+
+type GeoHarness = {
+  calls: number;
+  cleared: number[];
+  options?: PositionOptions;
+  success?: PositionCallback;
+  failure?: PositionErrorCallback;
+};
+declare global {
+  interface Window {
+    __testGeo: GeoHarness;
+    __testMaps: {
+      mapsCreated: number;
+      markersCreated: number;
+      markersRemoved: number;
+      failLoads: number;
+      imports: string[];
+    };
+  }
+}
+export async function installGeoHarness(page: Page) {
+  await page.addInitScript(() => {
+    window.__testGeo = { calls: 0, cleared: [] };
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        watchPosition(
+          success: PositionCallback,
+          failure: PositionErrorCallback,
+          options: PositionOptions,
+        ) {
+          const state = window.__testGeo;
+          state.success = success;
+          state.failure = failure;
+          state.options = options;
+          return ++state.calls;
+        },
+        clearWatch(id: number) {
+          window.__testGeo.cleared.push(id);
+        },
+      },
+    });
+  });
+}
+export async function emitLocation(page: Page, lat = 21.1458, lng = 79.0882) {
+  await page.evaluate(
+    ({ lat, lng }) => {
+      window.__testGeo.success?.({
+        coords: {
+          latitude: lat,
+          longitude: lng,
+          accuracy: 15,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null,
+        },
+        timestamp: Date.now(),
+      } as GeolocationPosition);
+    },
+    { lat, lng },
+  );
+}
+
+export async function fillManualSubmission(page: Page, name: string) {
+  await page.goto("/add");
+  await page.getByLabel("Mandal Name").fill(name);
+  await page
+    .getByLabel("Exact Location", { exact: true })
+    .fill("21.1458,79.0882");
+  await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
+}

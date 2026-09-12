@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+dist/
+.env*
+!.env.example
+*.tsbuildinfo
+playwright-report/
+test-results/
+verification-artifacts/
+.DS_Store
+npm-debug.log*
