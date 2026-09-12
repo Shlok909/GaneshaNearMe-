@@ -1,7 +1,7 @@
 import type { Pandal } from "@/lib/types";
 
 const namespace = "http://www.w3.org/2000/svg";
-export function createModakElement(pandal: Pandal) {
+export function createModakElement(pandal: Pick<Pandal, "area">) {
   const element = document.createElement("div");
   element.className = "modak-map-marker";
   const icon = document.createElementNS(namespace, "svg");

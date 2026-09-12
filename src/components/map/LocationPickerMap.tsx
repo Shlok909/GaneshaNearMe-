@@ -6,7 +6,6 @@ import type { Coordinates } from "@/lib/types";
 import { useUserLocation } from "@/hooks/useUserLocation";
 import { focusUserLocation, zoomMap } from "@/lib/map-camera";
 import { createModakElement } from "./ModakMapMarker";
-import { pandals } from "@/lib/mock-data";
 import { useGoogleMap } from "./useGoogleMap";
 import { MapErrorState } from "./MapErrorState";
 import { LocationFeedback } from "../LocationFeedback";
@@ -56,9 +55,6 @@ export default function LocationPickerMap({
     }
     if (!marker.current) {
       const element = createModakElement({
-        ...pandals[0],
-        id: "picker-point",
-        name: "Selected pandal location",
         area: "Selected point",
       });
       element.setAttribute("aria-label", "Selected pandal location");

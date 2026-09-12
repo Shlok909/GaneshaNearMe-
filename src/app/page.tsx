@@ -8,7 +8,7 @@ import {
   MapPin,
   Sparkles,
 } from "lucide-react";
-import { Brand, ModakIcon } from "@/components/Brand";
+import { Brand, AppLogo } from "@/components/Brand";
 
 export default function LandingPage() {
   return (
@@ -76,7 +76,7 @@ export default function LandingPage() {
               </div>
             </div>
             <div className="hero-floating-card floating-right">
-              <ModakIcon className="size-8 text-orange-500" />
+              <AppLogo className="size-8 text-orange-500" />
               <div>
                 <strong>One city. Countless blessings.</strong>
                 <span>Made for your Ganeshotsav</span>

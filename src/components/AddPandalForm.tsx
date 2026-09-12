@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   getSubmissionFieldErrors,
   PUBLIC_ACCESS_MESSAGE,
@@ -25,7 +25,7 @@ import { evaluateGanapatiSubmission } from "@/lib/submission-verification";
 import { LocationPickerField } from "./LocationPickerField";
 import { useFeedback } from "./ui/Feedback";
 import { ImagePicker } from "./ImagePicker";
-import { ModakIcon } from "./Brand";
+import { AppLogo } from "./Brand";
 
 export function AddPandalForm() {
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -40,8 +40,11 @@ export function AddPandalForm() {
   >(null);
   const [parseMessage, setParseMessage] = useState("");
   const [publicAccess, setPublicAccess] = useState("");
-  const [ganapatiNames, setGanapatiNames] = useState<string[]>([]);
-  const [decorationNames, setDecorationNames] = useState<string[]>([]);
+  const [ganapatiFiles, setGanapatiFiles] = useState<File[]>([]);
+  const [decorationFiles, setDecorationFiles] = useState<File[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const savingRef = useRef(false);
   const notify = useFeedback();
   function updateLocationText(text: string) {
     setLocationText(text);
@@ -71,8 +74,9 @@ export function AddPandalForm() {
       return next;
     });
   }
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (savingRef.current) return;
     const data = new FormData(event.currentTarget);
     const value = (key: string) => String(data.get(key) ?? "").trim();
     const details = {
@@ -93,34 +97,55 @@ export function AddPandalForm() {
       return;
     }
     setErrors(result.status === "rejected" ? nextErrors : {});
-    const { submission, persisted } = createLocalSubmission(
-      {
-        mandalName: details.mandalName,
-        locationText: locationText.trim(),
-        coordinates,
-        submitterName: details.submitterName,
-        submitterRole: details.submitterRole,
-        contact: details.contact,
-        publicAccess: details.publicAccess,
-        ganapatiImages: { names: ganapatiNames, count: ganapatiPhotos },
-        decorationImages: { names: decorationNames, count: decorationPhotos },
-      },
-      submissionId,
-    );
-    if (!persisted)
-      notify(
-        "Saved for this visit only. Browser storage is unavailable.",
-        "info",
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError("");
+    try {
+      const { submission, persisted } = await createLocalSubmission(
+        {
+          mandalName: details.mandalName,
+          locationText: locationText.trim(),
+          coordinates,
+          submitterName: details.submitterName,
+          submitterRole: details.submitterRole,
+          contact: details.contact,
+          publicAccess: details.publicAccess,
+          ganapatiImages: {
+            names: ganapatiFiles.map((file) => file.name),
+            count: ganapatiPhotos,
+          },
+          decorationImages: {
+            names: decorationFiles.map((file) => file.name),
+            count: decorationPhotos,
+          },
+        },
+        submissionId,
+        { ganapati: ganapatiFiles, decoration: decorationFiles },
       );
-    setSubmissionId(submission.id);
-    setSubmitted(submission.verificationStatus);
-    window.scrollTo({ top: 0, behavior: "instant" });
+      if (!persisted)
+        notify(
+          "Saved for this visit only. Browser storage is unavailable.",
+          "info",
+        );
+      setSubmissionId(submission.id);
+      setSubmitted(submission.verificationStatus);
+      window.scrollTo({ top: 0, behavior: "instant" });
+    } catch (error) {
+      setSaveError(
+        error instanceof Error
+          ? error.message
+          : "Photos could not be saved. Please try again.",
+      );
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
+    }
   }
   if (submitted && submitted !== "rejected")
     return (
       <div className="submission-success" role="status">
         <div className="success-symbol">
-          <ModakIcon className="size-16" />
+          <AppLogo className="size-16" />
           <span>
             <Check size={20} />
           </span>
@@ -195,181 +220,188 @@ export function AddPandalForm() {
           }}
           noValidate
         >
-          <p className="form-required-note">
-            Fields marked <span>*</span> are required.
-          </p>
-          <section className="form-section">
-            <div className="form-section-heading">
-              <span>01</span>
-              <div>
-                <h2>About your mandal</h2>
-                <p>Help people find their way to Bappa.</p>
+          <fieldset disabled={saving}>
+            <p className="form-required-note">
+              Fields marked <span>*</span> are required.
+            </p>
+            <section className="form-section">
+              <div className="form-section-heading">
+                <span>01</span>
+                <div>
+                  <h2>About your mandal</h2>
+                  <p>Help people find their way to Bappa.</p>
+                </div>
               </div>
-            </div>
-            <FormField
-              id="mandalName"
-              label="Mandal Name"
-              placeholder="e.g. Shree Ganesh Utsav Mandal"
-              error={errors.mandalName}
-            />
-            <FormField
-              id="location"
-              label="Exact Location"
-              placeholder="Paste Google Maps link or type location"
-              value={locationText}
-              onChange={(event) => updateLocationText(event.target.value)}
-              required={false}
-              error={errors.location}
-              icon={<MapPin size={18} />}
-              hint="Paste a Maps link or add the area and a nearby landmark. Confirm the exact point below."
-            />
-            {parseMessage && (
-              <p className="field-hint coordinate-parse-notice" role="status">
-                {parseMessage}
+              <FormField
+                id="mandalName"
+                label="Mandal Name"
+                placeholder="e.g. Shree Ganesh Utsav Mandal"
+                error={errors.mandalName}
+              />
+              <FormField
+                id="location"
+                label="Exact Location"
+                placeholder="Paste Google Maps link or type location"
+                value={locationText}
+                onChange={(event) => updateLocationText(event.target.value)}
+                required={false}
+                error={errors.location}
+                icon={<MapPin size={18} />}
+                hint="Paste a Maps link or add the area and a nearby landmark. Confirm the exact point below."
+              />
+              {parseMessage && (
+                <p className="field-hint coordinate-parse-notice" role="status">
+                  {parseMessage}
+                </p>
+              )}
+              <LocationPickerField
+                value={coordinates}
+                onChange={(point) => {
+                  setCoordinates(point);
+                  setCoordinateSource("map");
+                  setParseMessage("");
+                  clearError("coordinates");
+                }}
+                error={errors.coordinates}
+              />
+            </section>
+            <section className="form-section">
+              <div className="form-section-heading">
+                <span>02</span>
+                <div>
+                  <h2>Who are you?</h2>
+                  <p>A familiar face behind the celebration.</p>
+                </div>
+              </div>
+              <FormField
+                id="name"
+                label="Your Name"
+                placeholder="Your full name"
+                autoComplete="name"
+                error={errors.name}
+              />
+              <fieldset className="field">
+                <legend className="field-label">
+                  Your role<span className="required-mark"> *</span>
+                </legend>
+                <div className="radio-grid">
+                  <RadioCard
+                    id="role"
+                    name="role"
+                    value="Mandal Organizer"
+                    label="Mandal Organizer"
+                    icon={<UsersRound size={20} />}
+                    invalid={!!errors.role}
+                  />
+                  <RadioCard
+                    name="role"
+                    value="Volunteer"
+                    label="Volunteer"
+                    icon={<HeartHandshake size={20} />}
+                    invalid={!!errors.role}
+                  />
+                </div>
+                {errors.role && (
+                  <p id="role-error" className="field-error">
+                    {errors.role}
+                  </p>
+                )}
+              </fieldset>
+              <FormField
+                id="phone"
+                label="Organizer / Mandal Contact"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
+                placeholder="e.g. 98765 43210"
+                error={errors.phone}
+                icon={<Phone size={17} />}
+                hint="A mobile number for questions about your submission."
+              />
+            </section>
+            <section className="form-section">
+              <div className="form-section-heading">
+                <span>03</span>
+                <div>
+                  <h2>A glimpse of the celebration</h2>
+                  <p>Show us the idol and the space you’ve created.</p>
+                </div>
+              </div>
+              <div className="upload-grid">
+                <ImagePicker
+                  id="ganapati-photos"
+                  label="Ganapati Photos"
+                  max={2}
+                  onFilesChange={setGanapatiFiles}
+                  error={errors["ganapati-photos"]}
+                  onCountChange={(count) => {
+                    setGanapatiPhotos(count);
+                    if (count > 0) clearError("ganapati-photos");
+                  }}
+                />
+                <ImagePicker
+                  id="decoration-photos"
+                  label="Pandal & Decoration Photos"
+                  max={3}
+                  onFilesChange={setDecorationFiles}
+                  error={errors["decoration-photos"]}
+                  onCountChange={(count) => {
+                    setDecorationPhotos(count);
+                    if (count > 0) clearError("decoration-photos");
+                  }}
+                />
+              </div>
+            </section>
+            <section className="form-section last-section">
+              <fieldset>
+                <legend className="field-label public-question">
+                  Is this open to the general public?
+                  <span className="required-mark"> *</span>
+                </legend>
+                <div className="radio-grid">
+                  <RadioCard
+                    id="isPublic"
+                    name="isPublic"
+                    value="yes"
+                    label="Yes, everyone is welcome"
+                    invalid={!!errors.isPublic || publicAccess === "no"}
+                  />
+                  <RadioCard
+                    name="isPublic"
+                    value="no"
+                    label="No, it’s a private celebration"
+                    invalid={!!errors.isPublic || publicAccess === "no"}
+                  />
+                </div>
+                {(errors.isPublic || publicAccess === "no") && (
+                  <p id="isPublic-error" className="field-error">
+                    {publicAccess === "no"
+                      ? PUBLIC_ACCESS_MESSAGE
+                      : errors.isPublic}
+                  </p>
+                )}
+              </fieldset>
+            </section>
+            {saveError && (
+              <p className="photo-save-error" role="alert">
+                {saveError}
               </p>
             )}
-            <LocationPickerField
-              value={coordinates}
-              onChange={(point) => {
-                setCoordinates(point);
-                setCoordinateSource("map");
-                setParseMessage("");
-                clearError("coordinates");
-              }}
-              error={errors.coordinates}
-            />
-          </section>
-          <section className="form-section">
-            <div className="form-section-heading">
-              <span>02</span>
-              <div>
-                <h2>Who are you?</h2>
-                <p>A familiar face behind the celebration.</p>
-              </div>
+            <div className="submit-footer">
+              <p>
+                <ShieldCheck size={17} />
+                Only public Ganapatis can appear on the map.
+              </p>
+              <button type="submit" className="button button-primary">
+                {saving ? "Saving photos…" : "Submit Ganapati"}
+                <ArrowRight size={18} />
+              </button>
             </div>
-            <FormField
-              id="name"
-              label="Your Name"
-              placeholder="Your full name"
-              autoComplete="name"
-              error={errors.name}
-            />
-            <fieldset className="field">
-              <legend className="field-label">
-                Your role<span className="required-mark"> *</span>
-              </legend>
-              <div className="radio-grid">
-                <RadioCard
-                  id="role"
-                  name="role"
-                  value="Mandal Organizer"
-                  label="Mandal Organizer"
-                  icon={<UsersRound size={20} />}
-                  invalid={!!errors.role}
-                />
-                <RadioCard
-                  name="role"
-                  value="Volunteer"
-                  label="Volunteer"
-                  icon={<HeartHandshake size={20} />}
-                  invalid={!!errors.role}
-                />
-              </div>
-              {errors.role && (
-                <p id="role-error" className="field-error">
-                  {errors.role}
-                </p>
-              )}
-            </fieldset>
-            <FormField
-              id="phone"
-              label="Organizer / Mandal Contact"
-              type="tel"
-              autoComplete="tel"
-              inputMode="tel"
-              placeholder="e.g. 98765 43210"
-              error={errors.phone}
-              icon={<Phone size={17} />}
-              hint="A mobile number for questions about your submission."
-            />
-          </section>
-          <section className="form-section">
-            <div className="form-section-heading">
-              <span>03</span>
-              <div>
-                <h2>A glimpse of the celebration</h2>
-                <p>Show us the idol and the space you’ve created.</p>
-              </div>
-            </div>
-            <div className="upload-grid">
-              <ImagePicker
-                id="ganapati-photos"
-                label="Ganapati Photos"
-                max={2}
-                onFilesChange={setGanapatiNames}
-                error={errors["ganapati-photos"]}
-                onCountChange={(count) => {
-                  setGanapatiPhotos(count);
-                  if (count > 0) clearError("ganapati-photos");
-                }}
-              />
-              <ImagePicker
-                id="decoration-photos"
-                label="Pandal & Decoration Photos"
-                max={3}
-                onFilesChange={setDecorationNames}
-                error={errors["decoration-photos"]}
-                onCountChange={(count) => {
-                  setDecorationPhotos(count);
-                  if (count > 0) clearError("decoration-photos");
-                }}
-              />
-            </div>
-          </section>
-          <section className="form-section last-section">
-            <fieldset>
-              <legend className="field-label public-question">
-                Is this open to the general public?
-                <span className="required-mark"> *</span>
-              </legend>
-              <div className="radio-grid">
-                <RadioCard
-                  id="isPublic"
-                  name="isPublic"
-                  value="yes"
-                  label="Yes, everyone is welcome"
-                  invalid={!!errors.isPublic || publicAccess === "no"}
-                />
-                <RadioCard
-                  name="isPublic"
-                  value="no"
-                  label="No, it’s a private celebration"
-                  invalid={!!errors.isPublic || publicAccess === "no"}
-                />
-              </div>
-              {(errors.isPublic || publicAccess === "no") && (
-                <p id="isPublic-error" className="field-error">
-                  {publicAccess === "no"
-                    ? PUBLIC_ACCESS_MESSAGE
-                    : errors.isPublic}
-                </p>
-              )}
-            </fieldset>
-          </section>
-          <div className="submit-footer">
-            <p>
-              <ShieldCheck size={17} />
-              Only public Ganapatis can appear on the map.
-            </p>
-            <button type="submit" className="button button-primary">
-              Submit Ganapati
-              <ArrowRight size={18} />
-            </button>
-          </div>
+          </fieldset>
         </form>
         <aside className="submission-aside">
           <span className="aside-icon">
-            <ModakIcon className="size-10" />
+            <AppLogo className="size-10" />
           </span>
           <h2>
             Bring your Bappa

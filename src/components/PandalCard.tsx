@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { ListingPhoto } from "./ListingPhoto";
 import Link from "next/link";
 import { ArrowUpRight, MapPin, Navigation, Trash2 } from "lucide-react";
 import type { Pandal } from "@/lib/types";
@@ -28,10 +28,9 @@ export function PandalCard({
         onClick={onSelect}
       >
         <span className="nearby-image">
-          <Image
-            src={pandal.image}
-            alt={`Illustration of ${pandal.name}`}
-            fill
+          <ListingPhoto
+            photoSetId={pandal.photoSetId}
+            name={pandal.name}
             sizes="80px"
           />
         </span>
@@ -45,10 +44,7 @@ export function PandalCard({
             {formatDistance(pandal.distanceKm)}{" "}
             {pandal.verified && (
               <span>
-                <span className="tiny-dot" />{" "}
-                {pandal.id.startsWith("demo-")
-                  ? "Demo verified"
-                  : "Locally approved"}
+                <span className="tiny-dot" /> {"Locally approved"}
               </span>
             )}
           </span>
@@ -59,21 +55,12 @@ export function PandalCard({
   return (
     <article className="pandal-card">
       <div className="pandal-card-image">
-        <Image
-          src={pandal.image}
-          alt={`Illustration of Ganapati at ${pandal.name}`}
-          fill
+        <ListingPhoto
+          photoSetId={pandal.photoSetId}
+          name={pandal.name}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
-        {pandal.verified && (
-          <VerifiedBadge
-            label={
-              pandal.id.startsWith("demo-")
-                ? "Demo verified"
-                : "Locally approved"
-            }
-          />
-        )}
+        {pandal.verified && <VerifiedBadge label={"Locally approved"} />}
         <SaveButton id={pandal.id} compact />
       </div>
       <div className="pandal-card-body">

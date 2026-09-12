@@ -39,7 +39,7 @@ export function ProfileExperience() {
         <div className="profile-identity">
           <div className="profile-avatar">{initials}</div>
           <h2>{user.name}</h2>
-          <p>{user.email}</p>
+          <p>{user.email || "Exploring on this browser"}</p>
           <span className="profile-tag">
             <Heart size={13} /> A fellow Bappa explorer
           </span>
@@ -55,7 +55,7 @@ export function ProfileExperience() {
           <div className="account-detail">
             <Mail size={19} />
             <span>
-              Email<strong>{user.email}</strong>
+              Email<strong>{user.email || "Not added"}</strong>
             </span>
           </div>
         </div>
@@ -108,10 +108,10 @@ export function ProfileExperience() {
               save or share a place you love.
             </p>
             <p>
-              This preview uses demo listings on a real map. Location is
-              optional and stays in memory. Saved places and submission metadata
-              stay in this browser; local approval makes a submission visible
-              here.
+              This app shows approved public listings saved in this browser.
+              Location is optional and stays in memory. Saved places and
+              submission metadata stay in this browser; local approval makes a
+              submission visible here.
             </p>
             <Link href="/" className="text-link">
               About GaneshaNearMe

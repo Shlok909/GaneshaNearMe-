@@ -24,10 +24,10 @@ import {
   type EligibilityInput,
 } from "../src/lib/submission-eligibility";
 import {
-  combinePublicPandals,
+  getPublicPandals,
   parseSubmissions,
 } from "../src/lib/demo-submissions";
-import { pandals } from "../src/lib/mock-data";
+import { pandals } from "./fixtures/pandals";
 import type { Submission } from "../src/lib/types";
 
 const center = { lat: 21.1458, lng: 79.0882 };
@@ -223,7 +223,8 @@ test("directions URL encodes only requested valid coordinates and needs no key",
   ).toThrow();
 });
 
-test("only approved public records with coordinates merge, including legacy migration", () => {
+test("public discovery starts empty and accepts only approved public coordinates, including legacy migration", () => {
+  expect(getPublicPandals([])).toEqual([]);
   const record: Submission = {
     id: "local-test",
     mandalName: eligible.mandalName,
@@ -240,27 +241,21 @@ test("only approved public records with coordinates merge, including legacy migr
     verificationStatus: "manual_review",
     category: null,
   };
-  expect(combinePublicPandals(pandals, [record])).toEqual(pandals);
+  expect(getPublicPandals([record])).toEqual([]);
   expect(
-    combinePublicPandals(pandals, [
-      { ...record, verificationStatus: "rejected" },
-    ]),
-  ).toEqual(pandals);
+    getPublicPandals([{ ...record, verificationStatus: "rejected" }]),
+  ).toEqual([]);
   const approved = {
     ...record,
     verificationStatus: "approved" as const,
     category: "featured" as const,
   };
-  expect(combinePublicPandals(pandals, [approved]).at(-1)).toMatchObject({
+  expect(getPublicPandals([approved]).at(-1)).toMatchObject({
     id: record.id,
     category: "featured",
   });
-  expect(
-    combinePublicPandals(pandals, [{ ...approved, publicAccess: false }]),
-  ).toEqual(pandals);
-  expect(
-    combinePublicPandals(pandals, [{ ...approved, coordinates: null }]),
-  ).toEqual(pandals);
+  expect(getPublicPandals([{ ...approved, publicAccess: false }])).toEqual([]);
+  expect(getPublicPandals([{ ...approved, coordinates: null }])).toEqual([]);
   expect(
     parseSubmissions(
       JSON.stringify([record, record, { ...record, id: "bad" }]),

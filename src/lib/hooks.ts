@@ -9,9 +9,8 @@ import {
   subscribeStorage,
   writeStorage,
 } from "./demo-storage";
-import { pandals as mockPandals } from "./mock-data";
 import {
-  combinePublicPandals,
+  getPublicPandals,
   getSubmissionsSnapshot,
   parseSubmissions,
 } from "./demo-submissions";
@@ -58,10 +57,7 @@ export function useDemoSubmissions() {
 
 export function usePublicPandals() {
   const submissions = useDemoSubmissions();
-  return useMemo(
-    () => combinePublicPandals(mockPandals, submissions),
-    [submissions],
-  );
+  return useMemo(() => getPublicPandals(submissions), [submissions]);
 }
 
 export function useDemoUser() {

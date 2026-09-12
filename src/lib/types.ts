@@ -9,12 +9,11 @@ export type Pandal = {
   theme: string;
   image: string;
   gallery: string[];
+  photoSetId?: string;
   verified: boolean;
   coordinates: Coordinates;
   category?: PandalCategory;
   distanceKm?: number;
-  // Retained only for the unused Stage 1 MapMock reference component.
-  mapPosition?: { top: string; left: string };
 };
 
 export type DemoUser = { name: string; email: string };
@@ -32,6 +31,7 @@ export type Submission = {
   publicAccess: boolean;
   ganapatiImages: PhotoMetadata;
   decorationImages: PhotoMetadata;
+  photoSetId?: string;
   submittedAt: string;
   score: number;
   verificationStatus: SubmissionStatus;

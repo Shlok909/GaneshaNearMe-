@@ -1,5 +1,6 @@
 import {
   test,
+  emptyTest,
   expect,
   readyMap,
   installGeoHarness,
@@ -39,9 +40,9 @@ test("location is opt-in, moves the blue dot, filters nearby, and cleans up", as
   await search.fill("Dharampeth");
   await page.getByRole("option").first().getByRole("button").click();
   await expect(page.getByRole("dialog")).toContainText(
-    "Demo Dharampeth Cha Raja",
+    "Test Dharampeth Cha Raja",
   );
-  await expect(page.locator("#marker-demo-dharampeth")).toHaveCount(1);
+  await expect(page.locator("#marker-local-fixture-dharampeth")).toHaveCount(1);
   await expect(page.getByRole("dialog")).toContainText(/km away/);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Clear search" }).click();
@@ -51,7 +52,7 @@ test("location is opt-in, moves the blue dot, filters nearby, and cleans up", as
   await canvas.focus();
   await canvas.press("ArrowRight");
   await page.waitForTimeout(500);
-  const staticMarker = page.locator("#marker-demo-sitabuldi");
+  const staticMarker = page.locator("#marker-local-fixture-sitabuldi");
   const staticBefore = await staticMarker.getAttribute("style");
   const blueBefore = await page
     .locator(".map-user-marker")
@@ -318,9 +319,9 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   await page.goto("/home");
   await readyMap(page);
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
-  await page.locator("#marker-demo-dharampeth").click();
+  await page.locator("#marker-local-fixture-dharampeth").click();
   const sheet = page.getByRole("dialog");
-  await expect(sheet).toContainText("Demo Dharampeth Cha Raja");
+  await expect(sheet).toContainText("Test Dharampeth Cha Raja");
   const directions = new URL(
     (await sheet
       .getByRole("link", { name: "Get Directions" })
@@ -350,7 +351,7 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   await expect(page.getByRole("button", { name: "Link copied" })).toBeVisible();
   expect(
     await page.evaluate(() => document.documentElement.dataset.copied),
-  ).toBe(`${baseURL}/home?pandal=demo-dharampeth`);
+  ).toBe(`${baseURL}/home?pandal=local-fixture-dharampeth`);
   await page.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -362,7 +363,7 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   await page.getByRole("button", { name: "Link copied" }).click();
   expect(
     await page.evaluate(() => document.documentElement.dataset.shared),
-  ).toContain("Demo Dharampeth Cha Raja");
+  ).toContain("Test Dharampeth Cha Raja");
   await page.evaluate(() => {
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -382,7 +383,7 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
     exact: true,
   });
   await expect(fallback.getByLabel("Location link")).toHaveValue(
-    `${baseURL}/home?pandal=demo-dharampeth`,
+    `${baseURL}/home?pandal=local-fixture-dharampeth`,
   );
   await page.keyboard.press("Escape");
   await sheet.getByRole("button", { name: "Save", exact: true }).click();
@@ -458,249 +459,258 @@ test("location picker selects and changes points; URL parsing never expands shor
   await picker.getByRole("button", { name: "Use this location" }).click();
   expect(await page.evaluate(() => window.__testGeo.cleared)).toContain(1);
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
-    "21.15",
+    '"lat":21.15,',
   );
 });
 
-test("photo validation and automatic public approval store metadata without files", async ({
-  page,
-}) => {
-  const posts: string[] = [];
-  page.on("request", (request) => {
-    if (request.method() === "POST") posts.push(request.url());
-  });
-  await page.goto("/add");
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByText("Choose an exact location on the map.", { exact: true }),
-  ).toBeVisible();
-  await fillSubmission(page, "Test Approved Mandal");
-  await page.getByRole("button", { name: "Remove ganapati.png" }).click();
-  const upload = page.locator('input[name="ganapati-photos"]');
-  await upload.setInputFiles({
-    name: "bad.txt",
-    mimeType: "text/plain",
-    buffer: Buffer.from("invalid"),
-  });
-  await expect(
-    page.getByText(/Choose JPG, PNG or WebP images up to 5 MB/),
-  ).toBeVisible();
-  await upload.setInputFiles({
-    name: "large.png",
-    mimeType: "image/png",
-    buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
-  });
-  await expect(
-    page.getByText(/Choose JPG, PNG or WebP images up to 5 MB/),
-  ).toBeVisible();
-  await upload.setInputFiles([
-    photo,
-    { ...photo, name: "second.png" },
-    { ...photo, name: "third.png" },
-  ]);
-  await expect(
-    page.getByText("You can add up to 2 photos here."),
-  ).toBeVisible();
-  await expect(
-    page.locator(".image-picker").first().getByRole("img"),
-  ).toHaveCount(2);
-  await page.getByRole("button", { name: "Remove decoration.png" }).click();
-  await page.locator('input[name="decoration-photos"]').setInputFiles(
-    [1, 2, 3, 4].map((index) => ({
-      ...photo,
-      name: `decoration-${index}.png`,
-    })),
-  );
-  await expect(
-    page.getByText("You can add up to 3 photos here."),
-  ).toBeVisible();
-  await expect(
-    page.locator(".image-picker").last().getByRole("img"),
-  ).toHaveCount(3);
-  // A high score must not publish a point-less listing or discard its form.
-  await page
-    .getByLabel("Exact Location", { exact: true })
-    .fill("Near the market");
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByText("Choose an exact location on the map.", { exact: true }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Mandal Name")).toHaveValue(
-    "Test Approved Mandal",
-  );
-  await expect(
-    page.locator(".image-picker").first().getByRole("img"),
-  ).toHaveCount(2);
-  await page
-    .getByLabel("Exact Location", { exact: true })
-    .fill("21.1458,79.0882");
-  await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati submission has been approved.",
-    }),
-  ).toBeVisible();
-  const raw = await page.evaluate(() =>
-    localStorage.getItem("gnm_demo_submissions"),
-  );
-  const stored = JSON.parse(raw!).find(
-    (record: { mandalName: string }) =>
-      record.mandalName === "Test Approved Mandal",
-  );
-  expect(stored).toMatchObject({
-    verificationStatus: "approved",
-    score: 11,
-    category: "community",
-    contact: "+919876543210",
-    ganapatiImages: { count: 2 },
-    decorationImages: { count: 3 },
-  });
-  expect(raw).not.toMatch(/blob:|data:image|base64/);
-  expect(posts).toEqual([]);
-  await page.goto(`/home?pandal=${stored.id}`);
-  await readyMap(page);
-  await expect(page.getByRole("dialog")).toContainText("Test Approved Mandal");
-  await expect(page.getByRole("dialog")).not.toContainText(
-    /score|11 \/ 11|criteria/i,
-  );
-});
+emptyTest(
+  "photo validation and automatic approval keep image bytes out of localStorage",
+  async ({ page }) => {
+    const posts: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "POST") posts.push(request.url());
+    });
+    await page.goto("/add");
+    await page.getByRole("button", { name: "Submit Ganapati" }).click();
+    await expect(
+      page.getByText("Choose an exact location on the map.", { exact: true }),
+    ).toBeVisible();
+    await fillSubmission(page, "Test Approved Mandal");
+    await page.getByRole("button", { name: "Remove ganapati.png" }).click();
+    const upload = page.locator('input[name="ganapati-photos"]');
+    await upload.setInputFiles({
+      name: "bad.txt",
+      mimeType: "text/plain",
+      buffer: Buffer.from("invalid"),
+    });
+    await expect(
+      page.getByText(/Choose JPG, PNG or WebP images up to 5 MB/),
+    ).toBeVisible();
+    await upload.setInputFiles({
+      name: "large.png",
+      mimeType: "image/png",
+      buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
+    });
+    await expect(
+      page.getByText(/Choose JPG, PNG or WebP images up to 5 MB/),
+    ).toBeVisible();
+    await upload.setInputFiles([
+      photo,
+      { ...photo, name: "second.png" },
+      { ...photo, name: "third.png" },
+    ]);
+    await expect(
+      page.getByText("You can add up to 2 photos here."),
+    ).toBeVisible();
+    await expect(
+      page.locator(".image-picker").first().getByRole("img"),
+    ).toHaveCount(2);
+    await page.getByRole("button", { name: "Remove decoration.png" }).click();
+    await page.locator('input[name="decoration-photos"]').setInputFiles(
+      [1, 2, 3, 4].map((index) => ({
+        ...photo,
+        name: `decoration-${index}.png`,
+      })),
+    );
+    await expect(
+      page.getByText("You can add up to 3 photos here."),
+    ).toBeVisible();
+    await expect(
+      page.locator(".image-picker").last().getByRole("img"),
+    ).toHaveCount(3);
+    // A high score must not publish a point-less listing or discard its form.
+    await page
+      .getByLabel("Exact Location", { exact: true })
+      .fill("Near the market");
+    await page.getByRole("button", { name: "Submit Ganapati" }).click();
+    await expect(
+      page.getByText("Choose an exact location on the map.", { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Mandal Name")).toHaveValue(
+      "Test Approved Mandal",
+    );
+    await expect(
+      page.locator(".image-picker").first().getByRole("img"),
+    ).toHaveCount(2);
+    await page
+      .getByLabel("Exact Location", { exact: true })
+      .fill("21.1458,79.0882");
+    await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
+    await page.getByRole("button", { name: "Submit Ganapati" }).click();
+    await expect(
+      page.getByRole("heading", {
+        name: "Your Ganapati submission has been approved.",
+      }),
+    ).toBeVisible();
+    const raw = await page.evaluate(() =>
+      localStorage.getItem("gnm_demo_submissions"),
+    );
+    const stored = JSON.parse(raw!).find(
+      (record: { mandalName: string }) =>
+        record.mandalName === "Test Approved Mandal",
+    );
+    expect(stored).toMatchObject({
+      verificationStatus: "approved",
+      score: 11,
+      category: "community",
+      contact: "+919876543210",
+      ganapatiImages: { count: 2 },
+      decorationImages: { count: 3 },
+    });
+    expect(raw).not.toMatch(/blob:|data:image|base64/);
+    expect(posts).toEqual([]);
+    await page.goto(`/home?pandal=${stored.id}`);
+    await readyMap(page);
+    await expect(page.getByRole("dialog")).toContainText(
+      "Test Approved Mandal",
+    );
+    await expect(page.getByRole("dialog")).not.toContainText(
+      /score|11 \/ 11|criteria/i,
+    );
+  },
+);
 
-test("rejected submissions preserve entered fields and private high scores stay off the map", async ({
-  page,
-}) => {
-  await page.goto("/add");
-  await page.getByLabel("Mandal Name").fill("a");
-  await page.getByLabel("Organizer / Mandal Contact").fill("123");
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByText(
-      "We couldn't accept this listing based on the information provided.",
-    ),
-  ).toBeVisible();
-  await expect(page.getByLabel("Mandal Name")).toHaveValue("a");
-  await expect(page.getByLabel("Organizer / Mandal Contact")).toHaveValue(
-    "123",
-  );
-  await page.getByRole("button", { name: "Review and edit details" }).click();
-  await page.getByLabel("Mandal Name").fill("Editable Mandal");
-  await page
-    .getByLabel("Exact Location", { exact: true })
-    .fill("21.1458,79.0882");
-  await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati has been submitted for review.",
-      exact: true,
-    }),
-  ).toBeVisible();
-  const edited = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
-  );
-  expect(edited).toHaveLength(1);
-  expect(edited[0]).toMatchObject({
-    score: 5,
-    verificationStatus: "manual_review",
-  });
-  await fillSubmission(page, "Private Home Ganapati");
-  await page
-    .getByRole("radio", { name: "No, it’s a private celebration" })
-    .check();
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByText("Private celebrations will not appear on the public map."),
-  ).toBeVisible();
-  const records = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
-  );
-  expect(records[1]).toMatchObject({
-    score: 10,
-    verificationStatus: "manual_review",
-    publicAccess: false,
-  });
-  await page.goto("/home?pandal=" + records[1].id);
-  await readyMap(page);
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  await expect(page.locator(".modak-map-marker")).toHaveCount(7);
-  await page.goto("/admin");
-  await page
-    .getByRole("button", { name: "Review Private Home Ganapati" })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "Eligibility Score: 10 / 11",
-  );
-  await expect(
-    page.getByRole("dialog").getByRole("button", {
-      name: "Approve Private Home Ganapati as Featured",
-    }),
-  ).toBeDisabled();
-});
-
-test("local admin approves both categories, rejects, and publishes only approved records", async ({
-  page,
-}, testInfo) => {
-  for (const name of [
-    "Test Featured Mandal",
-    "Test Community Mandal",
-    "Test Rejected Mandal",
-  ]) {
-    await fillManualSubmission(page, name);
+emptyTest(
+  "rejected submissions preserve entered fields and private high scores stay off the map",
+  async ({ page }) => {
+    await page.goto("/add");
+    await page.getByLabel("Mandal Name").fill("a");
+    await page.getByLabel("Organizer / Mandal Contact").fill("123");
+    await page.getByRole("button", { name: "Submit Ganapati" }).click();
+    await expect(
+      page.getByText(
+        "We couldn't accept this listing based on the information provided.",
+      ),
+    ).toBeVisible();
+    await expect(page.getByLabel("Mandal Name")).toHaveValue("a");
+    await expect(page.getByLabel("Organizer / Mandal Contact")).toHaveValue(
+      "123",
+    );
+    await page.getByRole("button", { name: "Review and edit details" }).click();
+    await page.getByLabel("Mandal Name").fill("Editable Mandal");
+    await page
+      .getByLabel("Exact Location", { exact: true })
+      .fill("21.1458,79.0882");
+    await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
     await page.getByRole("button", { name: "Submit Ganapati" }).click();
     await expect(
       page.getByRole("heading", {
         name: "Your Ganapati has been submitted for review.",
+        exact: true,
       }),
     ).toBeVisible();
-  }
-  await page.goto("/admin");
-  await expect(page.locator(".request-card")).toHaveCount(3);
-  await page
-    .getByRole("button", { name: "Review Test Featured Mandal" })
-    .click();
-  await expect(page.getByRole("dialog")).toContainText(
-    "Eligibility Score: 5 / 11",
-  );
-  await expect(page.getByRole("dialog")).toContainText("Contact");
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Approve Test Featured Mandal as Featured" })
-    .click();
-  await page
-    .getByRole("button", { name: "Approve Test Community Mandal as Community" })
-    .click();
-  await page
-    .getByRole("button", { name: "Reject Test Rejected Mandal", exact: true })
-    .click();
-  await page.getByRole("button", { name: /^Approved/ }).click();
-  await expect(page.locator(".request-card")).toHaveCount(2);
-  await page.screenshot({
-    path: testInfo.outputPath("admin-approved.png"),
-    fullPage: true,
-  });
-  await page.reload();
-  await page.getByRole("button", { name: /^Rejected/ }).click();
-  await expect(page.locator(".request-card")).toContainText("Not Eligible");
-  await page.goto("/home");
-  await readyMap(page);
-  await expect(page.locator(".modak-map-marker")).toHaveCount(9);
-  await page.getByLabel("Search an area or Ganapati").fill("Test Featured");
-  await page.getByRole("option").getByRole("button").click();
-  const sheet = page.getByRole("dialog");
-  await expect(sheet).toContainText("Featured Public Pandal");
-  await sheet.getByRole("button", { name: "Save", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await page.getByRole("link", { name: "Saved", exact: true }).click();
-  await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "Test Featured Mandal", exact: true }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: "View", exact: true }).click();
-  await expect(page.getByRole("dialog")).toContainText("Test Featured Mandal");
-  await page.keyboard.press("Escape");
-  await page.getByLabel("Search an area or Ganapati").fill("Test Rejected");
-  await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(0);
-});
+    const edited = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
+    );
+    expect(edited).toHaveLength(1);
+    expect(edited[0]).toMatchObject({
+      score: 5,
+      verificationStatus: "manual_review",
+    });
+    await fillSubmission(page, "Private Home Ganapati");
+    await page
+      .getByRole("radio", { name: "No, it’s a private celebration" })
+      .check();
+    await page.getByRole("button", { name: "Submit Ganapati" }).click();
+    await expect(
+      page.getByText("Private celebrations will not appear on the public map."),
+    ).toBeVisible();
+    const records = await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
+    );
+    expect(records[1]).toMatchObject({
+      score: 10,
+      verificationStatus: "manual_review",
+      publicAccess: false,
+    });
+    await page.goto("/home?pandal=" + records[1].id);
+    await readyMap(page);
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await expect(page.locator(".modak-map-marker")).toHaveCount(0);
+    await page.goto("/admin");
+    await page
+      .getByRole("button", { name: "Review Private Home Ganapati" })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "Eligibility Score: 10 / 11",
+    );
+    await expect(
+      page.getByRole("dialog").getByRole("button", {
+        name: "Approve Private Home Ganapati as Featured",
+      }),
+    ).toBeDisabled();
+  },
+);
+
+emptyTest(
+  "local admin approves both categories, rejects, and publishes only approved records",
+  async ({ page }, testInfo) => {
+    for (const name of [
+      "Test Featured Mandal",
+      "Test Community Mandal",
+      "Test Rejected Mandal",
+    ]) {
+      await fillManualSubmission(page, name);
+      await page.getByRole("button", { name: "Submit Ganapati" }).click();
+      await expect(
+        page.getByRole("heading", {
+          name: "Your Ganapati has been submitted for review.",
+        }),
+      ).toBeVisible();
+    }
+    await page.goto("/admin");
+    await expect(page.locator(".request-card")).toHaveCount(3);
+    await page
+      .getByRole("button", { name: "Review Test Featured Mandal" })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "Eligibility Score: 5 / 11",
+    );
+    await expect(page.getByRole("dialog")).toContainText("Contact");
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Approve Test Featured Mandal as Featured" })
+      .click();
+    await page
+      .getByRole("button", {
+        name: "Approve Test Community Mandal as Community",
+      })
+      .click();
+    await page
+      .getByRole("button", { name: "Reject Test Rejected Mandal", exact: true })
+      .click();
+    await page.getByRole("button", { name: /^Approved/ }).click();
+    await expect(page.locator(".request-card")).toHaveCount(2);
+    await page.screenshot({
+      path: testInfo.outputPath("admin-approved.png"),
+      fullPage: true,
+    });
+    await page.reload();
+    await page.getByRole("button", { name: /^Rejected/ }).click();
+    await expect(page.locator(".request-card")).toContainText("Not Eligible");
+    await page.goto("/home");
+    await readyMap(page);
+    await expect(page.locator(".modak-map-marker")).toHaveCount(2);
+    await page.getByLabel("Search an area or Ganapati").fill("Test Featured");
+    await page.getByRole("option").getByRole("button").click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet).toContainText("Featured Public Pandal");
+    await sheet.getByRole("button", { name: "Save", exact: true }).click();
+    await page.keyboard.press("Escape");
+    await page.getByRole("link", { name: "Saved", exact: true }).click();
+    await page.reload();
+    await expect(
+      page.getByRole("heading", { name: "Test Featured Mandal", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("link", { name: "View", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText(
+      "Test Featured Mandal",
+    );
+    await page.keyboard.press("Escape");
+    await page.getByLabel("Search an area or Ganapati").fill("Test Rejected");
+    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(0);
+  },
+);
 
 test("responsive layouts keep map attribution and controls clear of navigation", async ({
   page,
@@ -750,7 +760,7 @@ test("responsive layouts keep map attribution and controls clear of navigation",
   }
 });
 
-test("browser geolocation permission works and production hides the developer location", async ({
+test("browser geolocation permission works and no demo location control exists", async ({
   page,
   context,
 }) => {
@@ -774,16 +784,7 @@ test("browser geolocation permission works and production hides the developer lo
   ).toBeVisible();
   await page.getByRole("button", { name: "Stop using my location" }).click();
   const demo = page.getByRole("button", { name: "Use Demo Nagpur Location" });
-  if (process.env.PLAYWRIGHT_PRODUCTION === "1") {
-    await expect(demo).toHaveCount(0);
-  } else {
-    await expect(demo).toBeVisible();
-    await demo.click();
-    await expect(
-      page.getByRole("img", { name: "Your live location" }),
-    ).toBeVisible();
-    await expect(page.getByLabel("Nearby radius")).toBeEnabled();
-  }
+  await expect(demo).toHaveCount(0);
 });
 
 test("filters and list toggles reuse the same Home map and detach markers on exit", async ({

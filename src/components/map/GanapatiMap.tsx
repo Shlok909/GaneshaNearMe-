@@ -206,7 +206,11 @@ export default function GanapatiMap({
           <LocateFixed size={21} />
         </button>
       </div>
-      <span className="map-demo-note">Demo listings · Tap a modak</span>
+      <span className="map-data-note">
+        {pandals.length
+          ? "Public Ganapatis · Tap a marker"
+          : "Your community map"}
+      </span>
     </section>
   );
 }

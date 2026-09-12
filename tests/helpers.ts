@@ -1,16 +1,51 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
+import { pandals } from "./fixtures/pandals";
+import type { Submission } from "../src/lib/types";
+
+const fixtureSubmissions: Submission[] = pandals.map((pandal) => ({
+  id: pandal.id,
+  mandalName: pandal.name,
+  locationText: pandal.area,
+  coordinates: pandal.coordinates,
+  submitterName: "Test Organizer",
+  submitterRole: "Organizer",
+  contact: "+919876543210",
+  publicAccess: true,
+  ganapatiImages: { names: ["test.png"], count: 1 },
+  decorationImages: { names: ["test-decoration.png"], count: 1 },
+  score: 11,
+  verificationStatus: "approved",
+  category: pandal.category ?? "community",
+  submittedAt: "2026-09-12T12:00:00.000Z",
+}));
+
 import { installGoogleMapsDouble } from "./google-maps-double";
 
-export const test = base.extend<{ browserErrors: string[] }>({
+export const test = base.extend<{
+  browserErrors: string[];
+  seedListings: boolean;
+}>({
+  seedListings: [true, { option: true }],
   browserErrors: [
-    async ({ page }, use) => {
+    async ({ page, seedListings }, use) => {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       page.on("console", (message) => {
         if (message.type() === "error") errors.push(message.text());
       });
       await page.addInitScript(installGoogleMapsDouble);
+      // Only isolated test contexts receive records. Never overwrite user submissions
+      // created later in a test, including after reload or a route navigation.
+      if (seedListings)
+        await page.addInitScript((records) => {
+          if (localStorage.getItem("gnm_demo_submissions") === null) {
+            localStorage.setItem(
+              "gnm_demo_submissions",
+              JSON.stringify(records),
+            );
+          }
+        }, fixtureSubmissions);
       await page.addInitScript(() => {
         Object.defineProperty(navigator, "share", {
           configurable: true,
@@ -26,6 +61,7 @@ export const test = base.extend<{ browserErrors: string[] }>({
     { auto: true },
   ],
 });
+export const emptyTest = test.extend({ seedListings: false });
 export { expect };
 
 export const photo = {

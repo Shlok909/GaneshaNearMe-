@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isValidCoordinates } from "@/lib/geo";
-import { DEFAULT_MAP_CENTER } from "@/lib/map-config";
 import type { Coordinates } from "@/lib/types";
 
 export type LocationStatus =
@@ -174,15 +173,5 @@ export function useUserLocation() {
     lastPosition.current = null;
     setLocation(INITIAL);
   }, [clearWatch]);
-  const useDemoLocation = useCallback(() => {
-    if (process.env.NODE_ENV !== "development") return;
-    clearWatch();
-    lastPosition.current = null;
-    setLocation({
-      status: "active",
-      position: { ...DEFAULT_MAP_CENTER, accuracy: 20 },
-      message: "Using Demo Nagpur Location.",
-    });
-  }, [clearWatch]);
-  return { ...location, requestLocation, stopLocation, useDemoLocation };
+  return { ...location, requestLocation, stopLocation };
 }

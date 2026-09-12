@@ -1,5 +1,7 @@
 "use client";
-import Image from "next/image";
+import { ListingPhoto } from "./ListingPhoto";
+import { ListingPhotoEditor } from "./ListingPhotoEditor";
+import { StoredSubmissionPhotos } from "./StoredSubmissionPhotos";
 import Link from "next/link";
 import { useState } from "react";
 import {
@@ -160,18 +162,17 @@ export function AdminDashboard() {
             <article className="request-card" key={request.id}>
               <div className="request-photos">
                 <div>
-                  <Image
-                    src="/illustrations/pandal.svg"
-                    alt="Pandal photo placeholder"
-                    fill
+                  <ListingPhoto
+                    photoSetId={request.photoSetId}
+                    name={request.mandalName}
                     sizes="180px"
                   />
                 </div>
                 <div>
-                  <Image
-                    src="/illustrations/decoration.svg"
-                    alt="Decoration photo placeholder"
-                    fill
+                  <ListingPhoto
+                    photoSetId={request.photoSetId}
+                    name={request.mandalName}
+                    kind="decoration"
                     sizes="100px"
                   />
                 </div>
@@ -272,7 +273,7 @@ export function AdminDashboard() {
         open={!!review}
         onClose={() => setReviewId(null)}
         title={review?.mandalName || "Untitled submission"}
-        description="Review public access, exact coordinates, submitter details and photo metadata."
+        description="Review public access, exact coordinates, submitter details and saved photos."
         className="review-modal"
         returnFocusId={returnFocusId}
       >
@@ -309,26 +310,15 @@ export function AdminDashboard() {
               ))}
             </dl>
             <ScoreBreakdown submission={review} />
-            <div className="review-photo-metadata">
-              <h3>Ganapati photos ({review.ganapatiImages.count})</h3>
-              <ul>
-                {review.ganapatiImages.names.map((name, i) => (
-                  <li key={i}>{name}</li>
-                ))}
-              </ul>
-              <h3>
-                Pandal & decoration photos ({review.decorationImages.count})
-              </h3>
-              <ul>
-                {review.decorationImages.names.map((name, i) => (
-                  <li key={i}>{name}</li>
-                ))}
-              </ul>
-              <p>
-                Photo files stay on the submitter’s device. Only filenames and
-                counts are saved in this preview.
-              </p>
-            </div>
+            <StoredSubmissionPhotos
+              key={`review-photos-${review.id}`}
+              photoSetId={review.photoSetId}
+              name={review.mandalName}
+            />
+            <ListingPhotoEditor
+              key={`photo-editor-${review.id}`}
+              listingId={review.id}
+            />
             {review.category && <CategoryBadge category={review.category} />}
             {review.verificationStatus === "manual_review" && (
               <div className="request-actions">

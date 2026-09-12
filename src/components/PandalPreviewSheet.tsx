@@ -11,6 +11,11 @@ import { ShareButton } from "./ShareButton";
 import { formatDistance } from "@/lib/geo";
 import { createGoogleMapsDirectionsUrl } from "@/lib/maps-links";
 import { CategoryBadge } from "./CategoryBadge";
+import { useListingPhotos } from "@/hooks/useListingPhotos";
+import type { PhotoKind } from "@/lib/local-photos";
+import { photoLabels, photoPlaceholders } from "./ListingPhoto";
+import { PhotoThumbnails } from "./PhotoThumbnails";
+import { ListingPhotoEditor } from "./ListingPhotoEditor";
 
 export function PandalPreviewSheet({
   pandal,
@@ -36,22 +41,39 @@ export function PandalPreviewSheet({
 }
 
 function PreviewContent({ pandal }: { pandal: Pandal }) {
-  const [selectedImage, setSelectedImage] = useState(pandal.image);
+  const photos = useListingPhotos(pandal.photoSetId);
+  const [selection, setSelection] = useState<{
+    kind: PhotoKind;
+    index: number;
+  }>({ kind: "ganapati", index: 0 });
+  const index = Math.min(
+    selection.index,
+    Math.max(0, photos[selection.kind].length - 1),
+  );
+  const selected = photos[selection.kind][index];
+  const selectedImage = selected?.url ?? photoPlaceholders[selection.kind];
   return (
     <>
       <div className="preview-hero">
         <Image
           src={selectedImage}
           alt={
-            selectedImage === pandal.image
-              ? `Illustration of ${pandal.name}`
-              : `Illustration of decorations at ${pandal.name}`
+            selected
+              ? `${photoLabels[selection.kind]} photo of ${pandal.name}`
+              : `${photoLabels[selection.kind]} photo placeholder`
           }
           fill
           sizes="(max-width: 640px) 100vw, 480px"
           priority
+          unoptimized
         />
-        <span className="illustration-label">Pandal illustration</span>
+        <span className="illustration-label">
+          {selected
+            ? `${photoLabels[selection.kind]} photo`
+            : photos.status === "loading"
+              ? "Loading photos…"
+              : `${photoLabels[selection.kind]} placeholder`}
+        </span>
       </div>
       <div className="preview-body">
         <div className="preview-meta">
@@ -59,15 +81,7 @@ function PreviewContent({ pandal }: { pandal: Pandal }) {
             <MapPin size={15} />
             {pandal.area}
           </span>
-          {pandal.verified && (
-            <VerifiedBadge
-              label={
-                pandal.id.startsWith("demo-")
-                  ? "Demo verified"
-                  : "Locally approved"
-              }
-            />
-          )}
+          {pandal.verified && <VerifiedBadge label={"Locally approved"} />}
         </div>
         <h2>{pandal.name}</h2>
         <CategoryBadge category={pandal.category} />
@@ -75,39 +89,29 @@ function PreviewContent({ pandal }: { pandal: Pandal }) {
         <div className="theme-box">
           <Sparkles size={18} />
           <div>
-            <h3>A peek at the theme</h3>
+            <h3>About this listing</h3>
             <p>{pandal.theme}</p>
           </div>
         </div>
-        <div className="preview-gallery">
-          {[pandal.image, ...pandal.gallery].map((src, index) => (
-            <button
-              type="button"
-              key={src}
-              aria-label={`View ${index === 0 ? "Ganapati" : index === 1 ? "pandal" : "decoration"} illustration`}
-              aria-pressed={selectedImage === src}
-              onClick={() => setSelectedImage(src)}
-            >
-              <Image
-                src={src}
-                alt={
-                  index === 0
-                    ? "Ganapati illustration"
-                    : "Pandal decoration illustration"
-                }
-                fill
-                sizes="120px"
-              />
-            </button>
-          ))}
-          {pandal.distanceKm !== undefined && (
-            <span>
-              <Navigation size={16} />
-              {formatDistance(pandal.distanceKm)}
-              <span>Straight-line distance</span>
-            </span>
-          )}
-        </div>
+        <PhotoThumbnails
+          photos={photos}
+          selected={{ kind: selection.kind, index }}
+          onSelect={setSelection}
+        />
+        {(photos.status === "missing" || photos.status === "error") && (
+          <p className="photo-availability-note">
+            {photos.status === "error"
+              ? "Saved photos could not be loaded. Check browser storage or attach the originals again."
+              : "No image files are saved for this listing. Earlier submissions kept filenames only; attach the originals below."}
+          </p>
+        )}
+        <ListingPhotoEditor listingId={pandal.id} />
+        {pandal.distanceKm !== undefined && (
+          <p className="photo-distance">
+            <Navigation size={16} />
+            {formatDistance(pandal.distanceKm)} · Straight-line distance
+          </p>
+        )}
         <div className="preview-actions">
           <SaveButton id={pandal.id} />
           <ShareButton id={pandal.id} name={pandal.name} />

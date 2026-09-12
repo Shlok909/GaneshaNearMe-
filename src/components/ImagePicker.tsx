@@ -4,7 +4,7 @@ import Image from "next/image";
 import { ImagePlus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-type Preview = { id: string; url: string; name: string };
+type Preview = { id: string; url: string; name: string; file: File };
 const supportedTypes = ["image/jpeg", "image/png", "image/webp"];
 
 export function ImagePicker({
@@ -14,13 +14,15 @@ export function ImagePicker({
   error,
   onCountChange,
   onFilesChange,
+  required = true,
 }: {
   id: string;
   label: string;
   max: number;
   error?: string;
-  onCountChange: (count: number) => void;
-  onFilesChange?: (names: string[]) => void;
+  onCountChange?: (count: number) => void;
+  onFilesChange?: (files: File[]) => void;
+  required?: boolean;
 }) {
   const [previews, setPreviews] = useState<Preview[]>([]);
   const [fileError, setFileError] = useState("");
@@ -51,12 +53,12 @@ export function ImagePicker({
     const additions = valid.slice(0, remaining).map((file) => {
       const url = URL.createObjectURL(file);
       urls.current.add(url);
-      return { id: url, url, name: file.name };
+      return { id: url, url, name: file.name, file };
     });
     const next = [...previews, ...additions];
     setPreviews(next);
-    onCountChange(next.length);
-    onFilesChange?.(next.map((preview) => preview.name));
+    onCountChange?.(next.length);
+    onFilesChange?.(next.map((preview) => preview.file));
     event.target.value = "";
   }
   return (
@@ -64,7 +66,7 @@ export function ImagePicker({
       <div className="upload-title">
         <label htmlFor={id}>
           {label}
-          <span className="required-mark"> *</span>
+          {required && <span className="required-mark"> *</span>}
         </label>
         <span>
           {previews.length}/{max}
@@ -115,8 +117,8 @@ export function ImagePicker({
                     (item) => item.id !== preview.id,
                   );
                   setPreviews(next);
-                  onCountChange(next.length);
-                  onFilesChange?.(next.map((preview) => preview.name));
+                  onCountChange?.(next.length);
+                  onFilesChange?.(next.map((preview) => preview.file));
                   setFileError("");
                 }}
               >
@@ -132,7 +134,7 @@ export function ImagePicker({
       >
         {fileError ||
           error ||
-          `Add 1–${max} clear photos. Photos stay on your device.`}
+          `Add 1–${max} clear photos. Images are saved in this browser.`}
       </p>
     </div>
   );

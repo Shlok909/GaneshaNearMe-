@@ -26,7 +26,7 @@ test("landing, demo login, map, saved deep links and logout remain working", asy
   await page.getByLabel("Search an area or Ganapati").press("ArrowDown");
   await page.getByLabel("Search an area or Ganapati").press("Enter");
   const sheet = page.getByRole("dialog");
-  await expect(sheet).toContainText("Demo Pratap Nagar Ganesh Utsav Mandal");
+  await expect(sheet).toContainText("Test Pratap Nagar Ganesh Utsav Mandal");
   await sheet.getByRole("button", { name: "Save", exact: true }).click();
   await expect(
     sheet.getByRole("button", { name: "Saved", exact: true }),
@@ -40,12 +40,12 @@ test("landing, demo login, map, saved deep links and logout remain working", asy
   await page.reload();
   await expect(
     page.getByRole("heading", {
-      name: "Demo Pratap Nagar Ganesh Utsav Mandal",
+      name: "Test Pratap Nagar Ganesh Utsav Mandal",
       exact: true,
     }),
   ).toBeVisible();
   await page.getByRole("link", { name: "View", exact: true }).click();
-  await expect(page).toHaveURL(/pandal=demo-pratap-nagar/);
+  await expect(page).toHaveURL(/pandal=local-fixture-pratap-nagar/);
   await expect(page.getByRole("dialog")).toBeVisible();
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Your profile" }).click();
@@ -84,7 +84,7 @@ test("signup validation and simulated Google entry remain working", async ({
     await page.evaluate(
       () => JSON.parse(localStorage.getItem("gnm_demo_user") || "{}").name,
     ),
-  ).toBe("Aarav Deshmukh");
+  ).toBe("Guest");
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
     "festival123",
   );

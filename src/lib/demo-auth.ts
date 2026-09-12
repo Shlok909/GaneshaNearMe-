@@ -2,8 +2,8 @@ import { readStorage, storageKeys, writeStorage } from "./demo-storage";
 import type { DemoUser } from "./types";
 
 export const defaultDemoUser: DemoUser = {
-  name: "Aarav Deshmukh",
-  email: "aarav@example.com",
+  name: "Guest",
+  email: "",
 };
 
 // Supabase Auth will replace this adapter. Never persist passwords in demo storage.

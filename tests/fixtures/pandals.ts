@@ -1,10 +1,10 @@
-import type { Pandal } from "./types";
+import type { Pandal } from "../../src/lib/types";
 
-// Demo fixtures only: names, coordinates and verification do not represent real verified mandals.
+// Test-only records. Never imported by application source or seeded into user browsers.
 export const pandals: Pandal[] = [
   {
-    id: "demo-dharampeth",
-    name: "Demo Dharampeth Cha Raja",
+    id: "local-fixture-dharampeth",
+    name: "Test Dharampeth Cha Raja",
     area: "Dharampeth",
     description:
       "A neighbourhood celebration full of devotion, marigolds and the warmth of coming together.",
@@ -17,8 +17,8 @@ export const pandals: Pandal[] = [
     category: "featured",
   },
   {
-    id: "demo-pratap-nagar",
-    name: "Demo Pratap Nagar Ganesh Utsav Mandal",
+    id: "local-fixture-pratap-nagar",
+    name: "Test Pratap Nagar Ganesh Utsav Mandal",
     area: "Pratap Nagar",
     description:
       "Traditional Ganapati celebration with a large decorative community pandal.",
@@ -31,8 +31,8 @@ export const pandals: Pandal[] = [
     category: "community",
   },
   {
-    id: "demo-sitabuldi",
-    name: "Demo Sitabuldi Ganesh Mandal",
+    id: "local-fixture-sitabuldi",
+    name: "Test Sitabuldi Ganesh Mandal",
     area: "Sitabuldi",
     description:
       "A joyful gathering in the heart of the city, celebrating Bappa with music and community spirit.",
@@ -45,8 +45,8 @@ export const pandals: Pandal[] = [
     category: "community",
   },
   {
-    id: "demo-ramdaspeth",
-    name: "Demo Ramdaspeth Sarvajanik Ganesh",
+    id: "local-fixture-ramdaspeth",
+    name: "Test Ramdaspeth Sarvajanik Ganesh",
     area: "Ramdaspeth",
     description:
       "An intimate community pandal with a beautiful handcrafted idol and a welcoming atmosphere.",
@@ -59,8 +59,8 @@ export const pandals: Pandal[] = [
     category: "featured",
   },
   {
-    id: "demo-sadar",
-    name: "Demo Sadar Ka Bappa",
+    id: "local-fixture-sadar",
+    name: "Test Sadar Ka Bappa",
     area: "Sadar",
     description:
       "Generations of local families come together for this colourful celebration of Ganeshotsav.",
@@ -73,8 +73,8 @@ export const pandals: Pandal[] = [
     category: "community",
   },
   {
-    id: "demo-wardhaman-nagar",
-    name: "Demo Wardhaman Nagar Ganesh Mandal",
+    id: "local-fixture-wardhaman-nagar",
+    name: "Test Wardhaman Nagar Ganesh Mandal",
     area: "Wardhaman Nagar",
     description:
       "Discover a lovingly decorated pandal created by the neighbourhood’s artists and volunteers.",
@@ -87,8 +87,8 @@ export const pandals: Pandal[] = [
     category: "community",
   },
   {
-    id: "demo-manish-nagar",
-    name: "Demo Manish Nagar Cha Maharaja",
+    id: "local-fixture-manish-nagar",
+    name: "Test Manish Nagar Cha Maharaja",
     area: "Manish Nagar",
     description:
       "A family-friendly public celebration with an elegant idol and thoughtful, handmade details.",

@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   },
   description:
     "Find a little devotion around the corner. Explore Ganapati pandals, discover decorations and save your next darshan with GnM.",
-  icons: { icon: "/icon.svg", apple: "/icon.svg" },
+  icons: { icon: "/logoofapp.png", apple: "/logoofapp.png" },
 };
 export const viewport: Viewport = {
   width: "device-width",

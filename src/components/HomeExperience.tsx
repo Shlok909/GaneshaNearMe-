@@ -1,6 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowDownWideNarrow,
@@ -98,12 +99,14 @@ export function HomeExperience() {
     setRadius("all");
   }
   const noNearby =
+    publicPandals.length > 0 &&
     !!location.position &&
     radius !== "all" &&
     !query.trim() &&
     !filtered.length;
   const empty = (
     <DiscoveryEmpty
+      noListings={publicPandals.length === 0}
       nearby={noNearby}
       radius={radius}
       onIncrease={() =>
@@ -233,20 +236,15 @@ export function HomeExperience() {
         onRetry={locate}
         onCancel={location.stopLocation}
       />
-      {process.env.NODE_ENV === "development" && (
-        <button
-          type="button"
-          className="demo-location-button"
-          onClick={() => {
-            setLocateRequest((value) => value + 1);
-            location.useDemoLocation();
-          }}
+      {(noNearby || !publicPandals.length) && view === "map" && (
+        <div
+          className={cn(
+            "mobile-location-empty",
+            !location.position && "before-location-empty",
+          )}
         >
-          Use Demo Nagpur Location
-        </button>
-      )}
-      {noNearby && view === "map" && (
-        <div className="mobile-location-empty">{empty}</div>
+          {empty}
+        </div>
       )}
       <div
         className="discovery-workspace"
@@ -277,7 +275,7 @@ export function HomeExperience() {
           </div>
           <div className="nearby-footer">
             <span className="tiny-dot" />
-            Demo listings and local community submissions.
+            Approved public submissions saved in this browser.
           </div>
         </aside>
         <div className="map-container">
@@ -316,16 +314,33 @@ export function HomeExperience() {
   );
 }
 function DiscoveryEmpty({
+  noListings,
   nearby,
   radius,
   onIncrease,
   onClear,
 }: {
+  noListings: boolean;
   nearby: boolean;
   radius: NearbyRadius;
   onIncrease: () => void;
   onClear: () => void;
 }) {
+  if (noListings) {
+    return (
+      <div className="search-empty first-listing-empty">
+        <MapPin size={28} />
+        <h3>No Ganapatis added yet.</h3>
+        <p>
+          Add your first public Ganapati. Approved listings will appear here and
+          stay saved in this browser.
+        </p>
+        <Link href="/add" className="button button-primary button-small">
+          Add a Ganapati
+        </Link>
+      </div>
+    );
+  }
   return (
     <div className="search-empty">
       <Search size={26} />
@@ -337,7 +352,7 @@ function DiscoveryEmpty({
       <p>
         {nearby
           ? "Try a wider radius to discover more places."
-          : "Try Pratap Nagar, Dharampeth or another area."}
+          : "Try a Ganapati name or area that has been added."}
       </p>
       <div className="empty-actions">
         {nearby && (
