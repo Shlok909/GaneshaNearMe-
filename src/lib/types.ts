@@ -16,7 +16,6 @@ export type Pandal = {
   distanceKm?: number;
 };
 
-export type DemoUser = { name: string; email: string };
 export type SubmissionStatus = "manual_review" | "approved" | "rejected";
 export type SubmitterRole = "Mandal Organizer" | "Volunteer";
 export type PhotoMetadata = { names: string[]; count: number };

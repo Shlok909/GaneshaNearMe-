@@ -1666,6 +1666,78 @@ input:focus-visible {
 .auth-form .field {
   margin-bottom: 0;
 }
+.auth-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: grid;
+  gap: 18px;
+}
+.auth-message {
+  overflow-wrap: anywhere;
+  margin: 12px 0;
+}
+.auth-confirmation {
+  display: grid;
+  gap: 22px;
+  color: #745135;
+}
+.auth-confirmation h1 {
+  color: #241b13;
+  text-wrap: balance;
+}
+.auth-confirmation p {
+  line-height: 1.65;
+}
+.google-button:disabled {
+  opacity: 0.75;
+  cursor: not-allowed;
+  font-size: 13px;
+}
+.auth-tabs button:disabled {
+  cursor: wait;
+}
+.auth-error-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.auth-error-card {
+  width: 100%;
+  max-width: 480px;
+  display: grid;
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #fffefa;
+}
+.auth-error-card h1 {
+  text-wrap: balance;
+}
+.auth-error-card p {
+  color: #745135;
+  line-height: 1.6;
+}
+.profile-edit-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 26px;
+}
+.profile-edit-form .button {
+  justify-self: start;
+}
+.profile-success {
+  color: #35552c;
+  margin-top: 12px;
+  font-weight: 600;
+}
+.avatar-button > span {
+  font-weight: 700;
+  font-size: 15px;
+}
 .auth-submit {
   width: 100%;
   margin-top: 5px;

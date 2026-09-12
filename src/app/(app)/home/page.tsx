@@ -1,10 +1,12 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { HomeExperience } from "@/components/HomeExperience";
+import { requireUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = { title: "Explore Ganapatis" };
 
-export default function HomePage() {
+export default async function HomePage() {
+  await requireUser("/home");
   return (
     <Suspense
       fallback={

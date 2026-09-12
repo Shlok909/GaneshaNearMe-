@@ -4,10 +4,20 @@ import type { Metadata } from "next";
 import { ArrowLeft, Heart } from "lucide-react";
 import { Brand } from "@/components/Brand";
 import { AuthForm } from "@/components/AuthForm";
+import { redirect } from "next/navigation";
+import { getVerifiedUser } from "@/lib/auth/session";
+import { safeNextPath } from "@/lib/auth/redirects";
+import { AUTH_CONFIG_MESSAGE, getSupabaseConfig } from "@/lib/supabase/config";
 
 export const metadata: Metadata = { title: "Welcome" };
 
-export default function AuthPage() {
+export default async function AuthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  if (await getVerifiedUser()) redirect("/home");
+  const { next } = await searchParams;
   return (
     <main id="main-content" className="auth-page">
       <section className="auth-story">
@@ -47,7 +57,12 @@ export default function AuthPage() {
           <div className="auth-mobile-brand">
             <Brand full href="/" />
           </div>
-          <AuthForm />
+          <AuthForm
+            nextPath={safeNextPath(next)}
+            configurationError={
+              getSupabaseConfig() ? undefined : AUTH_CONFIG_MESSAGE
+            }
+          />
         </div>
         <span className="auth-copyright">© 2026 GaneshaNearMe</span>
       </section>

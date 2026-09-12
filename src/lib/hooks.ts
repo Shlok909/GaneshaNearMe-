@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useSyncExternalStore } from "react";
-import { getUserSnapshot, parseDemoUser } from "./demo-auth";
 import {
   parseSaved,
   readStorage,
@@ -58,13 +57,4 @@ export function useDemoSubmissions() {
 export function usePublicPandals() {
   const submissions = useDemoSubmissions();
   return useMemo(() => getPublicPandals(submissions), [submissions]);
-}
-
-export function useDemoUser() {
-  const raw = useSyncExternalStore(
-    subscribeStorage,
-    getUserSnapshot,
-    serverSnapshot,
-  );
-  return useMemo(() => parseDemoUser(raw), [raw]);
 }

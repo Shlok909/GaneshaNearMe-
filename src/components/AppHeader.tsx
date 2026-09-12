@@ -1,8 +1,8 @@
 import Link from "next/link";
-import { MapPin, Plus, UserRound } from "lucide-react";
+import { MapPin, Plus } from "lucide-react";
 import { Brand } from "./Brand";
 
-export function AppHeader() {
+export function AppHeader({ initials }: { initials: string }) {
   return (
     <header className="app-header">
       <div className="app-header-inner">
@@ -21,7 +21,7 @@ export function AppHeader() {
             className="avatar-button"
             aria-label="Your profile"
           >
-            <UserRound size={21} />
+            <span aria-hidden="true">{initials}</span>
           </Link>
         </div>
       </div>

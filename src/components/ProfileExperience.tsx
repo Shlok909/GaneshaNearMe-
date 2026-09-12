@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import {
   ArrowUpRight,
   Bookmark,
+  CalendarDays,
   ChevronDown,
   ChevronRight,
   CircleHelp,
@@ -14,18 +16,65 @@ import {
   Mail,
   UserRound,
 } from "lucide-react";
-import { useDemoUser, useSavedPandals } from "@/lib/hooks";
-import { signOutDemo } from "@/lib/demo-auth";
+import { useSavedPandals } from "@/lib/hooks";
+import type { ProfileUser } from "@/lib/auth/user";
+import { logout, updateProfile } from "@/app/auth/actions";
+import { createClient } from "@/lib/supabase/client";
+import { validateName } from "@/lib/auth/validation";
 
-export function ProfileExperience() {
-  const user = useDemoUser();
+export function ProfileExperience({ user }: { user: ProfileUser }) {
   const { ids } = useSavedPandals();
   const router = useRouter();
-  const initials = user.name
-    .split(" ")
-    .slice(0, 2)
-    .map((part) => part[0])
-    .join("");
+  const pending = useRef(false);
+  const [busy, setBusy] = useState<"profile" | "logout" | null>(null);
+  const [error, setError] = useState<string>();
+  const [success, setSuccess] = useState(false);
+  async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (pending.current) return;
+    const data = new FormData(event.currentTarget);
+    const validationError = validateName(String(data.get("name") ?? ""));
+    setError(validationError);
+    setSuccess(false);
+    if (validationError) return;
+    pending.current = true;
+    setBusy("profile");
+    try {
+      const result = await updateProfile(data);
+      if (result.error) setError(result.error);
+      else {
+        setSuccess(true);
+        router.refresh();
+      }
+    } catch {
+      setError("We couldn't reach the server. Please try again.");
+    } finally {
+      pending.current = false;
+      setBusy(null);
+    }
+  }
+  async function signOut() {
+    if (pending.current) return;
+    pending.current = true;
+    setBusy("logout");
+    setError(undefined);
+    setSuccess(false);
+    try {
+      const result = await logout();
+      if (result.error) setError(result.error);
+      else {
+        // Server revoked the session and cleared cookies; notify the SDK's
+        // other tabs too. Supabase owns this broadcast and persistence.
+        await createClient().auth.signOut({ scope: "local" });
+        window.location.replace("/auth");
+      }
+    } catch {
+      setError("We couldn't sign you out right now. Please try again.");
+    } finally {
+      pending.current = false;
+      setBusy(null);
+    }
+  }
   return (
     <div className="profile-container">
       <div className="page-heading">
@@ -37,9 +86,9 @@ export function ProfileExperience() {
           <span>गणपती बाप्पा मोरया</span>
         </div>
         <div className="profile-identity">
-          <div className="profile-avatar">{initials}</div>
+          <div className="profile-avatar">{user.initials}</div>
           <h2>{user.name}</h2>
-          <p>{user.email || "Exploring on this browser"}</p>
+          <p>{user.email}</p>
           <span className="profile-tag">
             <Heart size={13} /> A fellow Bappa explorer
           </span>
@@ -55,9 +104,53 @@ export function ProfileExperience() {
           <div className="account-detail">
             <Mail size={19} />
             <span>
-              Email<strong>{user.email || "Not added"}</strong>
+              Email<strong>{user.email}</strong>
             </span>
           </div>
+          <div className="account-detail">
+            <CalendarDays size={19} />
+            <span>
+              Member since<strong>{user.memberSince}</strong>
+            </span>
+          </div>
+          <form onSubmit={saveProfile} className="profile-edit-form">
+            <label className="field-label" htmlFor="profile-name">
+              Full Name
+            </label>
+            <input
+              id="profile-name"
+              className="input"
+              name="name"
+              defaultValue={user.name}
+              key={user.name}
+              maxLength={80}
+              autoComplete="name"
+              required
+              disabled={!!busy}
+              aria-describedby={error ? "profile-feedback" : undefined}
+            />
+            <button
+              className="button button-secondary"
+              type="submit"
+              disabled={!!busy}
+            >
+              {busy === "profile" ? "Saving…" : "Save Changes"}
+            </button>
+          </form>
+          {error && (
+            <p
+              id="profile-feedback"
+              role="alert"
+              className="field-error auth-message"
+            >
+              {error}
+            </p>
+          )}
+          {success && (
+            <p role="status" className="profile-success">
+              Profile updated
+            </p>
+          )}
         </div>
         <Link href="/saved" className="profile-row">
           <span className="profile-row-icon">
@@ -123,13 +216,11 @@ export function ProfileExperience() {
           <button
             type="button"
             className="button logout-button"
-            onClick={() => {
-              signOutDemo();
-              router.push("/auth");
-            }}
+            disabled={!!busy}
+            onClick={signOut}
           >
             <LogOut size={18} />
-            Logout
+            {busy === "logout" ? "Signing out…" : "Logout"}
           </button>
         </div>
       </section>

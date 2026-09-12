@@ -220,8 +220,8 @@ export async function updateLocalSubmissionPhotos(
   return { persisted };
 }
 
-// STAGE 3: Protect Admin using Supabase authentication, roles and Row Level
-// Security/server-side authorization. Browser-local review is not secure.
+// TODO Stage 3 Part 2: add real admin roles and RLS/server-side authorization.
+// Supabase now guards the route, but browser-local review is not secure.
 export function reviewLocalSubmission(
   id: string,
   category: PandalCategory | "reject",

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import {
   ArrowRight,
   Eye,
@@ -10,68 +9,103 @@ import {
   Mail,
   UserRound,
 } from "lucide-react";
-import { signInDemo } from "@/lib/demo-auth";
-import { useFeedback } from "./ui/Feedback";
+import { authenticate } from "@/app/auth/actions";
+import { validateAuth } from "@/lib/auth/validation";
 
-export function AuthForm() {
+export function AuthForm({
+  nextPath = "/home",
+  configurationError,
+}: {
+  nextPath?: string;
+  configurationError?: string;
+}) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  const router = useRouter();
-  const notify = useFeedback();
-  function complete(name?: string, email?: string) {
-    setBusy(true);
-    const persisted =
-      name && email ? signInDemo({ name, email }) : signInDemo();
-    if (!persisted)
-      notify(
-        "Browser storage is unavailable. You can still explore this visit.",
-        "info",
-      );
-    router.push("/home");
-  }
-  function submit(event: React.FormEvent<HTMLFormElement>) {
+  const submitting = useRef(false);
+  const [message, setMessage] = useState<string>();
+  const [checkEmail, setCheckEmail] = useState(false);
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const data = new FormData(event.currentTarget);
-    const email = String(data.get("email") ?? "").trim();
-    const name = String(data.get("name") ?? "").trim();
-    const password = String(data.get("password") ?? "");
-    const nextErrors: Record<string, string> = {};
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-      nextErrors.email = "Enter a valid email address.";
-    if (password.length < 6) nextErrors.password = "Use at least 6 characters.";
-    if (mode === "signup" && name.length < 2)
-      nextErrors.name = "Please enter your name.";
-    if (mode === "signup" && password !== data.get("confirmPassword"))
-      nextErrors.confirmPassword = "Your passwords don’t match.";
+    if (submitting.current || configurationError) return;
+    const form = event.currentTarget;
+    const data = new FormData(form);
+    const nextErrors = validateAuth(data, mode);
     setErrors(nextErrors);
+    setMessage(undefined);
     const firstError = Object.keys(nextErrors)[0];
     if (firstError) {
       document.getElementById(`auth-${firstError}`)?.focus();
       return;
     }
-    complete(mode === "signup" ? name : "Ganapati Explorer", email);
+    submitting.current = true;
+    setBusy(true);
+    try {
+      const result = await authenticate(mode, data, nextPath);
+      if (result.errors) setErrors(result.errors);
+      else if (result.error) setMessage(result.error);
+      else {
+        form.reset();
+        setShowPassword(false);
+        if (result.checkEmail) setCheckEmail(true);
+        else if (result.redirectTo) window.location.replace(result.redirectTo);
+      }
+    } catch {
+      setMessage("We couldn't reach the server. Please try again.");
+    } finally {
+      submitting.current = false;
+      setBusy(false);
+    }
   }
+  if (checkEmail)
+    return (
+      <section className="auth-confirmation" role="status">
+        <Mail size={32} aria-hidden="true" />
+        <h1>Check your email</h1>
+        <p>
+          We sent a confirmation link to your email address. Confirm your email
+          to finish creating your account.
+        </p>
+        <button
+          type="button"
+          className="button button-primary"
+          onClick={() => {
+            setCheckEmail(false);
+            setMode("login");
+            setErrors({});
+            setMessage(undefined);
+          }}
+        >
+          Back to Login
+        </button>
+      </section>
+    );
   return (
     <>
       <div className="auth-tabs" role="group" aria-label="Account access">
         <button
           type="button"
+          disabled={busy}
           aria-pressed={mode === "login"}
           onClick={() => {
             setMode("login");
             setErrors({});
+            setMessage(undefined);
+            setShowPassword(false);
           }}
         >
           Login
         </button>
         <button
           type="button"
+          disabled={busy}
           aria-pressed={mode === "signup"}
           onClick={() => {
             setMode("signup");
             setErrors({});
+            setMessage(undefined);
+            setShowPassword(false);
           }}
         >
           Sign Up
@@ -89,76 +123,92 @@ export function AuthForm() {
             : "Join a community brought together by devotion."}
         </p>
       </div>
-      <button
-        type="button"
-        className="button google-button"
-        disabled={busy}
-        onClick={() => complete()}
-      >
+      <button type="button" className="button google-button" disabled>
         <GoogleIcon />
-        Continue with Google
+        Continue with Google · Coming soon
       </button>
       <div className="auth-divider">
         <span>or continue with email</span>
       </div>
       <form onSubmit={submit} noValidate className="auth-form" key={mode}>
-        {mode === "signup" && (
-          <AuthField
-            name="name"
-            label="Your name"
-            placeholder="Full name"
-            autoComplete="name"
-            icon={<UserRound size={18} />}
-            error={errors.name}
-          />
+        {(configurationError || message) && (
+          <p className="auth-message field-error" role="alert">
+            {configurationError || message}
+          </p>
         )}
-        <AuthField
-          name="email"
-          label="Email"
-          type="email"
-          placeholder="you@example.com"
-          autoComplete="email"
-          icon={<Mail size={18} />}
-          error={errors.email}
-        />
-        <AuthField
-          name="password"
-          label="Password"
-          type={showPassword ? "text" : "password"}
-          placeholder="At least 6 characters"
-          autoComplete={mode === "login" ? "current-password" : "new-password"}
-          icon={<LockKeyhole size={18} />}
-          error={errors.password}
-          action={
-            <button
-              type="button"
-              className="icon-button"
-              aria-label={showPassword ? "Hide password" : "Show password"}
-              onClick={() => setShowPassword((value) => !value)}
-            >
-              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-            </button>
-          }
-        />
-        {mode === "signup" && (
-          <AuthField
-            name="confirmPassword"
-            label="Confirm Password"
-            type={showPassword ? "text" : "password"}
-            placeholder="Enter your password again"
-            autoComplete="new-password"
-            icon={<LockKeyhole size={18} />}
-            error={errors.confirmPassword}
-          />
-        )}
-        <button
-          type="submit"
-          className="button button-primary auth-submit"
-          disabled={busy}
+        <fieldset
+          className="auth-fields"
+          disabled={busy || !!configurationError}
         >
-          {busy ? "Welcome in…" : mode === "login" ? "Login" : "Create Account"}
-          <ArrowRight size={18} />
-        </button>
+          {mode === "signup" && (
+            <AuthField
+              name="name"
+              label="Full Name"
+              maxLength={80}
+              placeholder="Full name"
+              autoComplete="name"
+              icon={<UserRound size={18} />}
+              error={errors.name}
+            />
+          )}
+          <AuthField
+            name="email"
+            label="Email"
+            type="email"
+            placeholder="you@example.com"
+            autoComplete="email"
+            icon={<Mail size={18} />}
+            error={errors.email}
+          />
+          <AuthField
+            name="password"
+            label="Password"
+            type={showPassword ? "text" : "password"}
+            placeholder={
+              mode === "signup" ? "At least 8 characters" : "Your password"
+            }
+            autoComplete={
+              mode === "login" ? "current-password" : "new-password"
+            }
+            icon={<LockKeyhole size={18} />}
+            error={errors.password}
+            action={
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+                onClick={() => setShowPassword((value) => !value)}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            }
+          />
+          {mode === "signup" && (
+            <AuthField
+              name="confirmPassword"
+              label="Confirm Password"
+              type={showPassword ? "text" : "password"}
+              placeholder="Enter your password again"
+              autoComplete="new-password"
+              icon={<LockKeyhole size={18} />}
+              error={errors.confirmPassword}
+            />
+          )}
+          <button
+            type="submit"
+            className="button button-primary auth-submit"
+            disabled={busy}
+          >
+            {busy
+              ? mode === "login"
+                ? "Signing in…"
+                : "Creating account…"
+              : mode === "login"
+                ? "Login"
+                : "Create Account"}
+            <ArrowRight size={18} />
+          </button>
+        </fieldset>
       </form>
       <p className="auth-footnote">
         For the love of Bappa. For the joy of discovering.

@@ -48,7 +48,7 @@ test("a fresh browser has no seeded listings, uses the supplied logo, and keeps 
   ).toBeVisible();
   await page.goto("/profile");
   await expect(
-    page.getByRole("heading", { name: "Guest", exact: true }),
+    page.getByRole("heading", { name: "Test Explorer", exact: true }),
   ).toBeVisible();
   await page.goto("/admin");
   await expect(page.locator(".request-card")).toHaveCount(0);
@@ -115,6 +115,7 @@ test("local submissions persist across reload, sync with admin in another tab, a
     .click();
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Saved", exact: true }).click();
+  await expect(page).toHaveURL(/\/saved$/);
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "My Local Ganapati", exact: true }),

@@ -2,6 +2,7 @@ import { test as base, expect, type Page } from "@playwright/test";
 
 import { pandals } from "./fixtures/pandals";
 import type { Submission } from "../src/lib/types";
+import { createServerClient } from "@supabase/ssr";
 
 const fixtureSubmissions: Submission[] = pandals.map((pandal) => ({
   id: pandal.id,
@@ -25,16 +26,62 @@ import { installGoogleMapsDouble } from "./google-maps-double";
 export const test = base.extend<{
   browserErrors: string[];
   seedListings: boolean;
+  authenticated: boolean;
+  authSession: void;
 }>({
   seedListings: [true, { option: true }],
+  authenticated: [true, { option: true }],
+  authSession: [
+    async ({ context, request, authenticated, baseURL }, use) => {
+      await request.post("http://127.0.0.1:54329/__test/reset");
+      if (authenticated) {
+        const client = createServerClient(
+          "http://127.0.0.1:54329",
+          "sb_publishable_test_only",
+          {
+            cookies: {
+              getAll: async () =>
+                (await context.cookies()).map(({ name, value }) => ({
+                  name,
+                  value,
+                })),
+              setAll: async (cookies) => {
+                await context.addCookies(
+                  cookies.map(({ name, value, options }) => ({
+                    name,
+                    value,
+                    url: baseURL!,
+                    sameSite: "Lax" as const,
+                    ...(options.maxAge
+                      ? {
+                          expires:
+                            Math.floor(Date.now() / 1000) + options.maxAge,
+                        }
+                      : {}),
+                  })),
+                );
+              },
+            },
+          },
+        );
+        const { error } = await client.auth.signInWithPassword({
+          email: "explorer@example.com",
+          password: "festival123",
+        });
+        expect(error).toBeNull();
+      }
+      await use();
+    },
+    { auto: true },
+  ],
   browserErrors: [
-    async ({ page, seedListings }, use) => {
+    async ({ page, context, seedListings }, use) => {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       page.on("console", (message) => {
         if (message.type() === "error") errors.push(message.text());
       });
-      await page.addInitScript(installGoogleMapsDouble);
+      await context.addInitScript(installGoogleMapsDouble);
       // Only isolated test contexts receive records. Never overwrite user submissions
       // created later in a test, including after reload or a route navigation.
       if (seedListings)
@@ -62,6 +109,7 @@ export const test = base.extend<{
   ],
 });
 export const emptyTest = test.extend({ seedListings: false });
+export const anonymousTest = test.extend({ authenticated: false });
 export { expect };
 
 export const photo = {

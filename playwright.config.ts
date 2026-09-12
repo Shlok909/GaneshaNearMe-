@@ -34,11 +34,23 @@ export default defineConfig({
       use: { viewport: { width: 1440, height: 960 } },
     },
   ],
-  webServer: {
-    command:
-      process.env.PLAYWRIGHT_SERVER_COMMAND || "npm run dev -- --port 3002",
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: "node tests/support/auth-server.mjs",
+      url: "http://127.0.0.1:54329/__test/state",
+      reuseExistingServer: false,
+    },
+    {
+      command: "node tests/support/start-app.mjs",
+      url: baseURL,
+      reuseExistingServer: false,
+      timeout: 180_000,
+      env: {
+        NEXT_BUILD_DIR: ".next-e2e",
+        NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54329",
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test_only",
+        NEXT_PUBLIC_SITE_URL: baseURL,
+      },
+    },
+  ],
 });

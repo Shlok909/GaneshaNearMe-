@@ -21,6 +21,14 @@ page.on("request", (request) => {
 });
 try {
   const target = process.argv[2] || "http://localhost:3002/home";
+  if (!process.env.GNM_TEST_EMAIL || !process.env.GNM_TEST_PASSWORD) {
+    throw new Error("Set GNM_TEST_EMAIL and GNM_TEST_PASSWORD to a confirmed test account for this signed-in Maps check.");
+  }
+  await page.goto(new URL("/auth", target).href);
+  await page.getByLabel("Email", { exact: true }).fill(process.env.GNM_TEST_EMAIL);
+  await page.getByLabel("Password", { exact: true }).fill(process.env.GNM_TEST_PASSWORD);
+  await page.getByRole("button", { name: "Login", exact: true }).last().click();
+  await expect(page).toHaveURL(/\/home$/);
   // Create a single local record through the actual form in this isolated context.
   await page.goto(new URL("/add", target).href);
   await page.getByLabel("Mandal Name").fill("Map integration check");

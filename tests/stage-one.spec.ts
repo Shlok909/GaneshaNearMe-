@@ -1,6 +1,6 @@
-import { test, expect, readyMap } from "./helpers";
+import { anonymousTest as test, expect, readyMap } from "./helpers";
 
-test("landing, demo login, map, saved deep links and logout remain working", async ({
+test("landing, email login, map, saved deep links and logout remain working", async ({
   page,
 }, testInfo) => {
   await page.goto("/");
@@ -37,6 +37,7 @@ test("landing, demo login, map, saved deep links and logout remain working", asy
   });
   await page.keyboard.press("Escape");
   await page.getByRole("link", { name: "Saved", exact: true }).click();
+  await expect(page).toHaveURL(/\/saved$/);
   await page.reload();
   await expect(
     page.getByRole("heading", {
@@ -53,16 +54,22 @@ test("landing, demo login, map, saved deep links and logout remain working", asy
   await page.getByRole("button", { name: "Logout" }).click();
   await expect(page).toHaveURL(/\/auth$/);
   expect(
-    await page.evaluate(() => localStorage.getItem("gnm_demo_user")),
-  ).toBeNull();
+    (await page.context().cookies()).filter((cookie) =>
+      cookie.name.includes("auth-token"),
+    ),
+  ).toHaveLength(0);
 });
 
-test("signup validation and simulated Google entry remain working", async ({
+test("signup validation, confirmation callback and disabled Google entry", async ({
   page,
+  request,
 }) => {
   await page.goto("/auth");
+  await expect(
+    page.getByRole("button", { name: /Continue with Google/ }),
+  ).toBeDisabled();
   await page.getByRole("button", { name: "Sign Up", exact: true }).click();
-  await page.getByLabel("Your name", { exact: true }).fill("Meera Joshi");
+  await page.getByLabel("Full Name", { exact: true }).fill("Meera Joshi");
   await page.getByLabel("Email", { exact: true }).fill("meera@example.com");
   await page.getByLabel("Password", { exact: true }).fill("festival123");
   await page.getByLabel("Confirm Password", { exact: true }).fill("different");
@@ -72,19 +79,29 @@ test("signup validation and simulated Google entry remain working", async ({
     .getByLabel("Confirm Password", { exact: true })
     .fill("festival123");
   await page.getByRole("button", { name: "Create Account" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Check your email" }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/\/auth$/);
+  const state = await (
+    await request.get("http://127.0.0.1:54329/__test/state")
+  ).json();
+  const confirmation = state.confirmations.find(
+    (entry: { email: string }) => entry.email === "meera@example.com",
+  );
+  await page.goto(
+    `/auth/confirm?type=email&token_hash=${confirmation.token_hash}`,
+  );
   await expect(page).toHaveURL(/\/home$/);
   await page.goto("/profile");
   await expect(
     page.getByRole("heading", { name: "Meera Joshi" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Logout" }).click();
-  await page.getByRole("button", { name: "Continue with Google" }).click();
-  await expect(page).toHaveURL(/\/home$/);
-  expect(
-    await page.evaluate(
-      () => JSON.parse(localStorage.getItem("gnm_demo_user") || "{}").name,
-    ),
-  ).toBe("Guest");
+  await expect(page).toHaveURL(/\/auth$/);
+  await expect(
+    page.getByRole("button", { name: /Continue with Google/ }),
+  ).toBeDisabled();
   expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toContain(
     "festival123",
   );

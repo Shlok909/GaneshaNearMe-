@@ -97,8 +97,8 @@ export function AdminDashboard() {
       </div>
       <div className="admin-preview-note">
         <span className="tiny-dot" />
-        Local review preview · Decisions affect only this browser. This admin
-        page is not access-protected.
+        Local review preview · Decisions affect only this browser. Any signed-in
+        user can access this preview; admin permissions are coming in Part 2.
       </div>
       <div className="admin-stats">
         {[

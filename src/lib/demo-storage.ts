@@ -6,8 +6,6 @@ const volatileKeys = new Set<string>();
 
 export const storageKeys = {
   saved: "gnm_saved_pandals",
-  loggedIn: "gnm_demo_logged_in",
-  user: "gnm_demo_user",
   submissions: "gnm_demo_submissions",
 } as const;
 

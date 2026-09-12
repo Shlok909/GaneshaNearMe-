@@ -698,6 +698,7 @@ emptyTest(
     await sheet.getByRole("button", { name: "Save", exact: true }).click();
     await page.keyboard.press("Escape");
     await page.getByRole("link", { name: "Saved", exact: true }).click();
+    await expect(page).toHaveURL(/\/saved$/);
     await page.reload();
     await expect(
       page.getByRole("heading", { name: "Test Featured Mandal", exact: true }),

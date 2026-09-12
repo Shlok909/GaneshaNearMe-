@@ -1,12 +1,12 @@
-# GaneshaNearMe (GnM) — Stage 2
+# GaneshaNearMe (GnM) — Stage 3 Part 1
 
-An incremental upgrade of the existing mobile-first app: real Google Maps, opt-in browser location, nearby discovery, a map location picker, and score-based local submissions. The app uses `public/logoofapp.png` for branding, stronger typography and consistent controls. Authentication remains simulated; routes, save/share flows and mobile preview sheets are preserved.
+An incremental upgrade of the existing mobile-first app: Supabase email/password authentication and profiles, real Google Maps, opt-in browser location, nearby discovery, a map location picker, and score-based local submissions. The app uses `public/logoofapp.png` for branding; save/share flows and mobile preview sheets are preserved.
 
-**Stage 2 is browser-local. Admin has no access protection, authentication is simulated, and Supabase/Stage 3 are not implemented.**
+**Authentication is real. Listings, saved places, photos and moderation remain browser-local. Admin requires login but is not admin-only yet.** See [Auth setup and verification](docs/stage-3-auth.md) for the Part 1 architecture, confirmation settings and limitations.
 
 ## Run and configure
 
-Use Node.js 20.9+ and npm.
+Use Node.js 22+ and npm. This integration was built with Node v24.15.0.
 
 ```powershell
 npm ci
@@ -17,11 +17,14 @@ npm run dev
 
 Open [localhost:3000/home](http://localhost:3000/home). If port 3000 is occupied, use the URL printed by Next.js.
 
-Place these two values in the project-root **.env.local**:
+Place these values in the project-root **.env.local**:
 
 ```dotenv
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_browser_api_key
 NEXT_PUBLIC_GOOGLE_MAP_ID=your_javascript_map_id
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your_publishable_key
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
 ```
 
 The user-supplied values are already configured locally and were verified against the live Google service. They are not reproduced in this document or hardcoded in source. .env.local is ignored; .env.example contains placeholders only. Restart development after changing them; rebuild production because NEXT_PUBLIC values are bundled at build time.
@@ -125,22 +128,20 @@ Metadata under gnm_demo_submissions includes ID, mandal/location/submitter/conta
 
 Manual-review requests can be approved as Featured Public Pandal or Community Pandal, or rejected. Only public requests with valid coordinates can be approved. Approved entries immediately appear on this browser's Home, search, saves and deep links.
 
-**Admin is an unprotected local simulation, with no real review team or shared database.** Code comments call for Stage 3 Supabase authentication, roles, RLS/server-side authorization and secure backend validation. LocalStorage can be edited by its owner; this score is not identity verification. No Stage 3 code, schema or migration is included.
+**Admin requires a valid Supabase login; every authenticated user can currently access this local preview.** Part 2 will add real admin authorization and shared moderation. LocalStorage can be edited by its owner; this score is not identity verification. No application schema, migration, RLS policy or Storage bucket is included in Part 1.
 
 ## Routes and persistence
 
-All routes remain: /, /auth, /home, /add, /saved, /profile and /admin.
+Public routes: /, /auth, /auth/confirm and /auth/error. Protected routes: /home, /add, /saved, /profile and /admin. Opening a protected route while signed out redirects to /auth with a safe return path.
 
 | Storage key          | Contents                                                   |
 | -------------------- | ---------------------------------------------------------- |
-| gnm_demo_logged_in   | Demo session flag                                          |
-| gnm_demo_user        | Demo name/email; never passwords                           |
 | gnm_saved_pandals    | Approved local listing IDs                                 |
 | gnm_demo_submissions | Local submission metadata and decisions; never image files |
 
 Storage is scoped to the browser origin, not an authenticated account. Existing malformed-data handling, cross-tab updates and memory fallback remain. Changes made on port 3002 will not appear on port 3000.
 
-**Maps JavaScript API is the only Google Maps API integrated.** No Places, Geocoding, Routes, Distance Matrix, Google Geolocation or Street View API feature is used. Browser geolocation, local math/search/parsing and ordinary Maps URL links provide the other functions. No Supabase integration is present.
+**Maps JavaScript API is the only Google Maps API integrated.** No Places, Geocoding, Routes, Distance Matrix, Google Geolocation or Street View API feature is used. Browser geolocation, local math/search/parsing and ordinary Maps URL links provide the other functions. Supabase Auth manages sessions through SDK cookies, not localStorage flags.
 
 ## Files in the Google migration
 
@@ -180,13 +181,10 @@ Existing Stage 2 geo.ts, maps-links.ts, useUserLocation.ts, LocationPickerField.
 npm run lint
 npm run typecheck
 npm run build
-npm run start -- --port 3002
-# In a second terminal:
-$env:PLAYWRIGHT_PRODUCTION = "1"
 npm run test:e2e
 ```
 
-Playwright uses installed Chrome by default. Configuration supports PLAYWRIGHT_BASE_URL, PLAYWRIGHT_SERVER_COMMAND and PLAYWRIGHT_CHANNEL=chromium. Without a running target it starts development on port 3002.
+Playwright uses installed Chrome by default. Keep ports 3002 and 54329 free: the suite starts an isolated production build in `.next-e2e` and an HTTP Auth contract double with signed ES256 JWTs/JWKS. Test-only environment values select that service; the application has no test auth bypass. The default development build and real Supabase credentials remain separate. PLAYWRIGHT_CHANNEL can select another installed Chromium browser.
 
 The automated UI suite injects a deterministic **Google Maps interface test double**, with browser geolocation/share/clipboard fixtures. It tests our integration behavior without consuming live map loads; it does not prove real SDK rendering. Logic coverage includes all 64 valid/invalid combinations of the six scoring criteria, thresholds, private-access override, Haversine, parsing, phone validation, storage migration and publication safety.
 
@@ -195,8 +193,8 @@ Browser coverage includes landing/auth/save regression, geo permission success/m
 The separate live Google check uses actual SDK traffic, creates one local submission through the form in an isolated browser and verifies its Advanced Modak marker, selection/preview, picker confirmation and one SDK load across both maps, and records console errors/warnings:
 
 ```powershell
-node scripts/check-google-map.mjs
-# Optional target:
+# Set GNM_TEST_EMAIL and GNM_TEST_PASSWORD in your shell to a confirmed test
+# account; do not commit credentials. Run the app first, then:
 node scripts/check-google-map.mjs http://localhost:3000/home
 ```
 
@@ -212,4 +210,4 @@ Verification on 12 September 2026:
 
 The checks cover empty first use, local approval and reload persistence, updates across browser tabs, saved listings, simulated browser location, map controls, form validation and responsive layouts. Photo checks compare actual image bytes in both categories after reload, in Saved and Admin, and after updating only one group. They also verify storage-failure retry and legacy listing updates.
 
-Remaining limitations: simulated authentication, browser-origin-only storage and moderation, unprotected Admin, unrecoverable photos from the old filename-only version, device-dependent location accuracy and external Google availability. The user confirmed actual current-location rendering in Chrome. Supabase integration remains unstarted.
+Remaining limitations: browser-origin-only listing/photo storage and moderation, authenticated-only Admin awaiting real roles, unrecoverable photos from the old filename-only version, device-dependent location accuracy and external Google availability. The user confirmed actual current-location rendering in Chrome. Google OAuth and Stage 3 Part 2 are not implemented.
