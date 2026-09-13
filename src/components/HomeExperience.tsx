@@ -4,7 +4,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  BadgeCheck,
   LayoutList,
   LocateFixed,
   Map,
@@ -14,7 +13,6 @@ import {
 } from "lucide-react";
 import { usePublicPandals } from "@/lib/hooks";
 import { usePandalData } from "./PandalDataProvider";
-import { cn } from "@/lib/utils";
 import type { Pandal } from "@/lib/types";
 import {
   includeSelected,
@@ -42,7 +40,6 @@ export function HomeExperience() {
   const publicPandals = usePublicPandals();
   const location = useUserLocation();
   const [query, setQuery] = useState("");
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
   const data = usePandalData();
   const loading = data.loading;
   const loadError = data.error;
@@ -66,14 +63,9 @@ export function HomeExperience() {
     () => searchPandals(sorted, query),
     [sorted, query],
   );
-  const filtered = useMemo(
-    () =>
-      searchResults.filter((pandal) => !verifiedOnly || pandal.verified),
-    [searchResults, verifiedOnly],
-  );
   const markers = useMemo(
-    () => includeSelected(filtered, selected),
-    [filtered, selected],
+    () => includeSelected(searchResults, selected),
+    [searchResults, selected],
   );
   function select(pandal: Pandal) {
     setRoutePandalId(null);
@@ -94,8 +86,8 @@ export function HomeExperience() {
     setReturnFocus("ganapati-discovery-map");
     setRoutePandalId(pandal.id);
     setRouteRequest(value => value + 1);
-    // A marker tap is an explicit request for directions. Ask once; denied or
-    // unavailable location is retried only through the existing location controls.
+    // Only the details sheet's route action requests directions. Browsing a
+    // marker never prompts for location or consumes the Routes API allowance.
     if (!location.position && location.status === "idle") location.requestLocation();
   }
   function clearRoute() {
@@ -113,107 +105,83 @@ export function HomeExperience() {
       location.requestLocation();
     }
   }
-  function clearFilters() {
+  function clearSearch() {
     setQuery("");
-    setVerifiedOnly(false);
   }
   const empty = loading ? <div className="search-empty" role="status">Loading Ganapati listings…</div> : loadError ?
     <div className="search-empty" role="alert"><p>{loadError}</p><button className="button button-secondary" type="button" onClick={data.refresh}>Retry</button></div> : (
     <DiscoveryEmpty
       noListings={publicPandals.length === 0}
-      onClear={clearFilters}
+      onClear={clearSearch}
     />
   );
   return (
     <main id="main-content" className="discovery-page map-first-discovery" data-view={view} data-routing={!!routeTarget} data-location={location.status}>
       <h1 className="sr-only">Explore Ganapatis</h1>
       <div className="discovery-controls">
-      <div className="discovery-toolbar">
-        <AreaSearchBar
-          value={query}
-          onChange={setQuery}
-          results={searchResults}
-          onSelect={select}
+        <div className="discovery-toolbar">
+          <AreaSearchBar
+            value={query}
+            onChange={setQuery}
+            results={searchResults}
+            onSelect={select}
+          />
+          <div className="nearby-controls">
+            <button
+              type="button"
+              className="location-action"
+              onClick={locate}
+              disabled={location.status === "requesting"}
+              aria-label={location.status === "requesting" ? "Locating…" : location.position ? "My Location" : "Use My Location"}
+              title={location.position ? "My Location" : "Use My Location"}
+            >
+              <LocateFixed size={17} />
+              <span className="location-action-label">{location.status === "requesting"
+                ? "Locating…"
+                : location.position
+                  ? "My Location"
+                  : "Use My Location"}</span>
+            </button>
+            <span className="nearby-count" aria-live="polite">
+              {searchResults.length} listed
+            </span>
+            {location.position && (
+              <button
+                type="button"
+                className="icon-button stop-location"
+                aria-label="Stop using my location"
+                onClick={() => { location.stopLocation(); if (routeTarget) clearRoute(); }}
+              >
+                <X size={16} />
+              </button>
+            )}
+          </div>
+          <div className="view-toggle" role="group" aria-label="Discovery view">
+            <button
+              type="button"
+              aria-label="Map view"
+              aria-pressed={view === "map"}
+              onClick={() => setView("map")}
+            >
+              <Map size={17} />
+              <span>Map</span>
+            </button>
+            <button
+              type="button"
+              aria-label="List view"
+              aria-pressed={view === "list"}
+              onClick={() => setView("list")}
+            >
+              <LayoutList size={17} />
+              <span>List</span>
+            </button>
+          </div>
+        </div>
+        <LocationFeedback
+          location={location}
+          onRetry={locate}
+          onCancel={location.stopLocation}
         />
-        <div className="filter-group">
-          <button
-            type="button"
-            className={cn("filter-chip", !verifiedOnly && "selected")}
-            aria-pressed={!verifiedOnly}
-            aria-label="All Ganapatis"
-            onClick={() => setVerifiedOnly(false)}
-          >
-            <MapPin size={16} />
-            All
-          </button>
-          <button
-            type="button"
-            className={cn("filter-chip", verifiedOnly && "selected")}
-            aria-pressed={verifiedOnly}
-            aria-label="Verified"
-            title="Verified Ganapatis"
-            onClick={() => setVerifiedOnly((value) => !value)}
-          >
-            <BadgeCheck size={16} />
-            <span>Verified</span>
-          </button>
-        </div>
-        <div className="view-toggle" role="group" aria-label="Discovery view">
-          <button
-            type="button"
-            aria-label="Map view"
-            aria-pressed={view === "map"}
-            onClick={() => setView("map")}
-          >
-            <Map size={17} />
-            <span>Map</span>
-          </button>
-          <button
-            type="button"
-            aria-label="List view"
-            aria-pressed={view === "list"}
-            onClick={() => setView("list")}
-          >
-            <LayoutList size={17} />
-            <span>List</span>
-          </button>
-        </div>
-      </div>
-      <div className="nearby-controls">
-        <button
-          type="button"
-          className="location-action"
-          onClick={locate}
-          disabled={location.status === "requesting"}
-          aria-label={location.status === "requesting" ? "Locating…" : location.position ? "My Location" : "Use My Location"}
-          title={location.position ? "My Location" : "Use My Location"}
-        >
-          <LocateFixed size={17} />
-          <span className="location-action-label">{location.status === "requesting"
-            ? "Locating…"
-            : location.position
-              ? "My Location"
-              : "Use My Location"}</span>
-        </button>
-        <span className="nearby-count" aria-live="polite">
-          {filtered.length} listed
-        </span>
-        {location.position && (
-          <button
-            type="button"
-            className="icon-button stop-location"
-            aria-label="Stop using my location"
-            onClick={() => { location.stopLocation(); if (routeTarget) clearRoute(); }}
-          >
-            <X size={16} />
-          </button>
-        )}
-      </div>
-      <LocationFeedback
-        location={location}
-        onRetry={locate}
-        onCancel={location.stopLocation}
-      />
       </div>
       {routeTarget && view === "map" && <GanapatiRouteCard
         pandal={routeTarget}
@@ -233,19 +201,19 @@ export function HomeExperience() {
             userLocation={location.position}
             locateRequest={locateRequest}
             route={route.result}
-            onSelect={startRoute}
+            onSelect={select}
             onLocate={locate}
           />
-          {!filtered.length && !selected && (
+          {!searchResults.length && !selected && (
             <div className="map-empty">{empty}</div>
           )}
         </div>
       </div>
       {view === "list" && (
         <div className="discovery-list-view">
-          {filtered.length ? (
+          {searchResults.length ? (
             <div className="card-grid">
-              {filtered.map((pandal) => (
+              {searchResults.map((pandal) => (
                 <PandalCard key={pandal.id} pandal={pandal} />
               ))}
             </div>
@@ -299,7 +267,7 @@ function DiscoveryEmpty({
           className="button button-secondary button-small"
           onClick={onClear}
         >
-          Clear filters
+          Clear search
         </button>
       </div>
     </div>

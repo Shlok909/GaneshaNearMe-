@@ -32,6 +32,10 @@ test("mobile controls remain readable and do not overlap during location trackin
     await page.setViewportSize({ width, height: 620 });
     await page.goto("/home");
     await readyMap(page);
+    await expect(page.getByRole("button", { name: "All Ganapatis", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Verified", exact: true })).toHaveCount(0);
+    await expect(page.locator(".modak-map-marker")).toHaveCount(7);
+    await expect(page.locator(".location-action-label")).toBeVisible();
     await page.getByRole("button", { name: "Use My Location", exact: true }).first().click();
     await emitLocation(page);
     const buttons = page.locator(".discovery-controls button").filter({ visible: true });

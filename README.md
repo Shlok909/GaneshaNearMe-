@@ -47,7 +47,7 @@ See [Supabase API keys](https://supabase.com/docs/guides/getting-started/api-key
 
 - Share a Ganapati: enter its details, choose an exact map point, and add 1–2 Ganapati plus 1–3 decoration photos. A draft is created, files upload privately, and a guarded backend RPC scores and finalizes it.
 - Scores 0–2 are rejected, 3–6 require review, and 7–11 are approved. Approved public listings appear as Community pandals. Obvious nearby duplicates require review. Private celebrations are never published, including when approved.
-- Home shows an edge-to-edge map with floating search, filters and location controls. All published listings stay available, with no distance dropdown or hidden radius cutoff. Opt-in browser location sorts listings nearest first. Location remains in memory unless explicitly chosen as the submitted pandal's point. PostGIS nearby queries remain available in the backend for future use.
+- Home shows an edge-to-edge map with floating search, location controls and map/list switching. All published listings stay available, with no All/Verified filters, distance dropdown or hidden radius cutoff. Opt-in browser location sorts listings nearest first. Location remains in memory unless explicitly chosen as the submitted pandal's point. PostGIS nearby queries remain available in the backend for future use.
 - Saves and profile/submission history follow the signed-in account across browsers.
 - Admins review real requests, promote Featured listings, or reject/remove published entries. A regular signed-in user cannot access the dashboard or call its privileged operation.
 
@@ -59,7 +59,7 @@ The [security and mobile review](docs/security-and-mobile.md) covers server-only
 
 ## Maps and photos
 
-The app uses Maps JavaScript API and Routes API. Tapping a Modak asks for your current location when needed, then draws Google's driving route in blue and fits the complete journey on the map. A compact card shows route distance and estimated time without live traffic; **View details** opens the existing photos/save/share sheet. Search and shared links still open details, with a **Show route on map** action.
+The app uses Maps JavaScript API and Routes API. Tapping a Modak opens the photos/save/share details sheet without requesting location or calling Routes API. Choosing **Show route on map** closes the sheet, asks for your current location when needed, then draws Google's driving route in blue and fits the complete journey on the map. A compact card shows route distance and estimated time without live traffic; **View details** reopens the sheet. Search and shared links open the same details and route action.
 
 Enable **Routes API** in Google Cloud and use a dedicated server key restricted to **Routes API**, configured as `GOOGLE_ROUTES_API_KEY`. The browser sends coordinates to the authenticated `POST /api/routes` endpoint; the server calls Google and returns only the path, distance, duration and warnings. The Routes key is never bundled into client JavaScript. There is no fallback to the Maps JavaScript key. The endpoint checks the session and request origin, validates and bounds the body, fixes the routing options to basic driving, and never caches or logs GPS coordinates. Keep your Google Cloud daily request quota configured to control usage across users. A working base map alone does not confirm permission to compute routes.
 

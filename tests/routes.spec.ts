@@ -10,12 +10,23 @@ test.beforeEach(async ({ page }) => {
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
 });
 
-test("Modak tap requests location, draws Google's blue path, and preserves details", async ({ page }, testInfo) => {
+test("Modak opens details and only Show route on map requests location and draws the blue path", async ({ page }, testInfo) => {
   expect(await page.evaluate(() => window.__testGeo.calls)).toBe(0);
   expect(await page.evaluate(() => window.__testMaps.imports)).not.toContain("routes");
   await page.locator(firstMarker).click();
-  await expect(page.getByRole("dialog")).toHaveCount(0);
   const card = page.getByRole("region", { name: "Route to selected Ganapati" });
+  const details = page.getByRole("dialog", { name: "Test Dharampeth Cha Raja", exact: true });
+  await expect(details).toBeVisible();
+  await expect(details.getByRole("button", { name: "Show route on map" })).toBeVisible();
+  await expect(card).toHaveCount(0);
+  await expect(page.locator(".test-route-polyline")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__testGeo.calls)).toBe(0);
+  expect(await page.evaluate(() => window.__testMaps.routeRequests)).toHaveLength(0);
+  await page.keyboard.press("Escape");
+  await expect(page.locator(firstMarker)).toBeFocused();
+  await page.locator(firstMarker).press("Enter");
+  await details.getByRole("button", { name: "Show route on map" }).click();
+  await expect(details).toHaveCount(0);
   await expect(card).toContainText("Finding your location");
   expect(await page.evaluate(() => window.__testGeo.calls)).toBe(1);
   expect(await page.evaluate(() => window.__testMaps.routeRequests)).toHaveLength(0);
@@ -32,10 +43,10 @@ test("Modak tap requests location, draws Google's blue path, and preserves detai
   const fitted = await page.evaluate(() => window.__testMaps.maps[0].fittedPoints);
   expect(fitted).toContainEqual({ lat: 21.1458, lng: 79.0882 });
   expect(fitted).toContainEqual({ lat: 21.1393, lng: 79.0607 });
-  await page.getByRole("button", { name: "View details" }).click();
+  await card.getByRole("button", { name: "View details", exact: true }).click();
   await expect(page.getByRole("dialog")).toContainText("Test Dharampeth Cha Raja");
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: "View details" })).toBeFocused();
+  await expect(card.getByRole("button", { name: "View details", exact: true })).toBeFocused();
   await expect(page.locator(".test-route-polyline")).toHaveCount(1);
   const external = new URL((await card.getByRole("link", { name: "Open in Google Maps" }).getAttribute("href"))!);
   expect(external.searchParams.get("origin")).toBe("21.1458,79.0882");
@@ -56,9 +67,13 @@ test("latest selection wins and clearing ignores pending route responses", async
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
   await page.evaluate(() => window.__testMaps.routeResponses.push({ delay: 1500 }, {}));
   await page.locator(firstMarker).click();
+  await page.getByRole("button", { name: "Show route on map" }).click();
   await expect.poll(() => page.evaluate(() => window.__testMaps.routeRequests.length)).toBe(1);
   // Keyboard activation also works when the previous selection moved the camera.
   await page.locator(secondMarker).dispatchEvent("gmp-click");
+  await expect(page.getByRole("dialog")).toContainText("Test Sitabuldi Ganesh Mandal");
+  await expect(page.locator(".ganapati-route-card")).toHaveCount(0);
+  await page.getByRole("button", { name: "Show route on map" }).click();
   await expect(page.locator(".ganapati-route-card")).toContainText("Test Sitabuldi Ganesh Mandal");
   await expect(page.locator(".test-route-polyline")).toHaveCount(1);
   await page.waitForTimeout(1600);
@@ -76,9 +91,11 @@ test("latest selection wins and clearing ignores pending route responses", async
 
 test("permission denial does not invent an origin or repeatedly prompt; retry retains destination", async ({ page }) => {
   await page.locator(firstMarker).click();
+  await page.getByRole("button", { name: "Show route on map" }).click();
   await page.evaluate(() => window.__testGeo.failure?.({ code: 1, message: "denied" } as GeolocationPositionError));
   await expect(page.getByText(/Location access is blocked/)).toBeVisible();
   await page.locator(firstMarker).dispatchEvent("gmp-click");
+  await page.getByRole("button", { name: "Show route on map" }).click();
   expect(await page.evaluate(() => window.__testGeo.calls)).toBe(1);
   expect(await page.evaluate(() => window.__testMaps.routeRequests)).toHaveLength(0);
   await page.getByRole("button", { name: "Try Again", exact: true }).click();
@@ -93,6 +110,7 @@ test("permission denial does not invent an origin or repeatedly prompt; retry re
 test("API failure and no route are truthful, recoverable states without a fake line", async ({ page }) => {
   await page.evaluate(() => window.__testMaps.routeResponses.push({ error: "PERMISSION_DENIED" }, { empty: true }, { warnings: ["Test route advisory"] }));
   await page.locator(firstMarker).click();
+  await page.getByRole("button", { name: "Show route on map" }).click();
   await emitLocation(page);
   await expect(page.locator(".ganapati-route-card")).toContainText("The route could not be loaded");
   await expect(page.locator(".test-route-polyline")).toHaveCount(0);
@@ -107,6 +125,7 @@ test("API failure and no route are truthful, recoverable states without a fake l
 test("route refresh ignores GPS jitter, follows significant movement, and cleans up on exit", async ({ page }) => {
   await page.clock.install();
   await page.locator(firstMarker).click();
+  await page.getByRole("button", { name: "Show route on map" }).click();
   await emitLocation(page);
   await expect(page.locator(".test-route-polyline")).toHaveCount(1);
   await emitLocation(page, 21.14581, 79.08821);
@@ -127,6 +146,7 @@ test("silent routing times out and late success cannot replace the error", async
   await page.clock.install();
   await page.evaluate(() => window.__testMaps.routeResponses.push({ delay: 40000 }));
   await page.locator(firstMarker).click();
+  await page.getByRole("button", { name: "Show route on map" }).click();
   await emitLocation(page);
   await expect.poll(() => page.evaluate(() => window.__testMaps.routeRequests.length)).toBe(1);
   await page.clock.runFor(25001);
@@ -143,6 +163,7 @@ test("details can start a route and a selected destination survives search and l
   await page.getByLabel("Search an area or Ganapati").fill("Dharampeth");
   await page.getByRole("option").first().getByRole("button").click();
   await expect(page.getByRole("dialog")).toContainText("Test Dharampeth Cha Raja");
+  expect(await page.evaluate(() => window.__testMaps.routeRequests)).toHaveLength(0);
   await page.getByRole("button", { name: "Show route on map" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("listbox", { name: "Matching Ganapatis" })).toHaveCount(0);
@@ -153,4 +174,21 @@ test("details can start a route and a selected destination survives search and l
   await page.getByRole("button", { name: "Map view", exact: true }).click();
   await expect(page.locator(".test-route-polyline")).toHaveCount(1);
   expect(await page.evaluate(() => window.__testMaps.routeRequests)).toHaveLength(1);
+});
+
+test("browsing marker details with a known location does not start a route", async ({ page }) => {
+  await page.getByRole("button", { name: "Use My Location", exact: true }).first().click();
+  await emitLocation(page);
+  await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
+  await page.locator(firstMarker).click();
+  await expect(page.getByRole("dialog")).toContainText("Test Dharampeth Cha Raja");
+  await page.getByRole("button", { name: "Close details", exact: true }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.locator(firstMarker)).toBeFocused();
+  await page.locator(secondMarker).dispatchEvent("gmp-click");
+  await expect(page.getByRole("dialog")).toContainText("Test Sitabuldi Ganesh Mandal");
+  await expect(page.locator(".ganapati-route-card")).toHaveCount(0);
+  await expect(page.locator(".test-route-polyline")).toHaveCount(0);
+  expect(await page.evaluate(() => window.__testMaps.routeRequests)).toHaveLength(0);
+  expect(await page.evaluate(() => window.__testGeo.calls)).toBe(1);
 });

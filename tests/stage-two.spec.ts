@@ -297,7 +297,6 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   await readyMap(page);
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
   await page.locator("#marker-local-fixture-dharampeth").click();
-  await page.getByRole("button", { name: "View details", exact: true }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet).toContainText("Test Dharampeth Cha Raja");
   const directions = new URL(
@@ -516,15 +515,18 @@ test("browser geolocation permission works and no demo location control exists",
   await expect(demo).toHaveCount(0);
 });
 
-test("filters and list toggles reuse the same Home map and detach markers on exit", async ({
+test("search and list toggles keep all published listings on the same map and detach markers on exit", async ({
   page,
 }) => {
   await page.goto("/home");
   await readyMap(page);
   await page.getByRole("button", { name: "List view" }).click();
   await page.getByRole("button", { name: "Map view" }).click();
-  await page.getByRole("button", { name: "Verified", exact: true }).click();
-  await page.getByRole("button", { name: "All Ganapatis", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Verified", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "All Ganapatis", exact: true })).toHaveCount(0);
+  await page.getByLabel("Search an area or Ganapati").fill("Dharampeth");
+  await expect(page.locator(".modak-map-marker")).toHaveCount(1);
+  await page.getByLabel("Search an area or Ganapati").fill("");
   expect(await page.evaluate(() => window.__testMaps.mapsCreated)).toBe(1);
   expect(await page.evaluate(() => window.__testMaps.imports)).toEqual([
     "maps",

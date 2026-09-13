@@ -88,7 +88,7 @@ export default function GanapatiMap({
         const marker = new google.maps.marker.AdvancedMarkerElement({
           map,
           position: pandal.coordinates,
-          title: "Route to " + pandal.name + ", " + pandal.area,
+          title: "View details for " + pandal.name + ", " + pandal.area,
           gmpClickable: true,
           anchorTop: "-50%",
           zIndex: 1,
@@ -230,7 +230,7 @@ export default function GanapatiMap({
       </div>
       <span className="map-data-note">
         {route ? "Blue line · Driving route" : pandals.length
-          ? "Public Ganapatis · Tap a Modak for a route"
+          ? "Public Ganapatis · Tap a Modak for details"
           : "Your community map"}
       </span>
     </section>
