@@ -18,7 +18,7 @@ export function subscribeMapsAuthFailure(listener: () => void) {
   };
 }
 
-// Only the maps and marker libraries of Maps JavaScript API are requested.
+// Discovery and the picker request only maps and markers.
 // A shared promise prevents duplicate SDK loads across Home and the lazy picker.
 export function loadGoogleMaps(): Promise<GoogleMapsLibraries> {
   if (!HAS_GOOGLE_MAPS_CONFIG)

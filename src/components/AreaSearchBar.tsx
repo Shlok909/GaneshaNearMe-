@@ -129,7 +129,7 @@ export function AreaSearchBar({
             </p>
           )}
           <p className="search-scope">
-            Searches all listed Ganapatis, including places outside your radius.
+            Search all listed Ganapatis by name or area.
           </p>
         </div>
       )}

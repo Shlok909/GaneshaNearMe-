@@ -3,18 +3,18 @@
 import Image from "next/image";
 import { useState } from "react";
 import { useListingPhotos } from "@/hooks/useListingPhotos";
-import type { PhotoKind } from "@/lib/local-photos";
+import type { PhotoKind, PhotoPaths } from "@/lib/types";
 import { PhotoThumbnails } from "./PhotoThumbnails";
 import { photoLabels, photoPlaceholders } from "./ListingPhoto";
 
 export function StoredSubmissionPhotos({
-  photoSetId,
+  paths,
   name,
 }: {
-  photoSetId?: string;
+  paths?: PhotoPaths;
   name: string;
 }) {
-  const photos = useListingPhotos(photoSetId);
+  const photos = useListingPhotos(paths);
   const [selected, setSelected] = useState<{ kind: PhotoKind; index: number }>({
     kind: "ganapati",
     index: 0,
@@ -37,17 +37,19 @@ export function StoredSubmissionPhotos({
           fill
           sizes="(max-width: 640px) 90vw, 500px"
           unoptimized
+          onError={photo ? photos.onError : undefined}
         />
       </div>
       <PhotoThumbnails
         photos={photos}
         selected={{ kind: selected.kind, index }}
         onSelect={setSelected}
+        onError={photos.onError}
       />
       {(photos.status === "missing" || photos.status === "error") && (
         <p className="photo-availability-note">
-          No readable image files are saved for this listing. Attach the
-          original photos below.
+          Photos could not be loaded.
+          <button type="button" className="text-link" onClick={photos.retry}>Retry photos</button>
         </p>
       )}
     </div>

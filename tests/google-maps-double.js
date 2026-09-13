@@ -7,6 +7,9 @@ export function installGoogleMapsDouble() {
     failLoads: 0,
     imports: [],
     maps: [],
+    routeRequests: [],
+    routeResponses: [],
+    polylines: [],
   };
   window.__testMaps = state;
   class LatLng {
@@ -48,6 +51,7 @@ export function installGoogleMapsDouble() {
   class TestMap {
     listeners = new Map();
     markers = new Set();
+    lines = new Set();
     constructor(host, options) {
       state.mapsCreated++;
       state.maps.push(this);
@@ -93,6 +97,7 @@ export function installGoogleMapsDouble() {
     }
     update() {
       this.markers.forEach((marker) => marker.render());
+      this.lines.forEach(line => line.render());
     }
     addListener(name, callback) {
       if (!this.listeners.has(name)) this.listeners.set(name, new Set());
@@ -108,6 +113,7 @@ export function installGoogleMapsDouble() {
       this.update();
     }
     fitBounds(bounds) {
+      this.fittedPoints = bounds.points;
       const lats = bounds.points.map((point) => point.lat);
       const lngs = bounds.points.map((point) => point.lng);
       this.center = {
@@ -120,6 +126,7 @@ export function installGoogleMapsDouble() {
     getCenter() {
       return new LatLng(this.center);
     }
+    getDiv() { return this.host; }
     getZoom() {
       return this.zoom;
     }
@@ -198,8 +205,67 @@ export function installGoogleMapsDouble() {
     }
   }
   customElements.define("gmp-advanced-marker", AdvancedMarker);
+  class Polyline {
+    constructor(options) {
+      this.options = options;
+      state.polylines.push(this);
+      this.element = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      this.element.setAttribute("class", "test-route-polyline");
+      this.element.style.cssText = "position:absolute;inset:0;width:100%;height:100%;pointer-events:none";
+      this.path = document.createElementNS("http://www.w3.org/2000/svg", "polyline");
+      this.path.setAttribute("fill", "none");
+      this.path.setAttribute("stroke", options.strokeColor);
+      this.path.setAttribute("stroke-width", String(options.strokeWeight));
+      this.element.append(this.path);
+      if (options.map) this.setMap(options.map);
+    }
+    setMap(map) {
+      this.map?.lines.delete(this);
+      this.element.remove();
+      this.map = map;
+      if (map) {
+        map.lines.add(this);
+        map.surface.prepend(this.element);
+        this.render();
+      }
+    }
+    render() {
+      const map = this.map;
+      if (!map) return;
+      this.path.setAttribute("points", this.options.path.map(point => [
+        map.host.clientWidth / 2 + (point.lng - map.center.lng) * map.scale(),
+        map.host.clientHeight / 2 - (point.lat - map.center.lat) * map.scale(),
+      ].join(",")).join(" "));
+    }
+  }
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    if (String(input) === "/api/routes") {
+      if (new Headers(init.headers).has("X-Goog-Api-Key")) throw new Error("Routes key leaked to browser request");
+      const body = JSON.parse(init.body);
+      const request = {
+        origin: body.origin,
+        destination: body.destination,
+        travelMode: "DRIVE",
+      };
+      state.routeRequests.push(request);
+      const response = state.routeResponses.shift() || {};
+      if (response.delay) await new Promise(resolve => setTimeout(resolve, response.delay));
+      if (response.error) return Response.json({ error: response.error }, { status: 403 });
+      if (response.empty) return Response.json({ route: null });
+      // Deliberately bent contract path, distinct from a straight origin/destination line.
+      const path = [request.origin, { lat: request.origin.lat, lng: request.destination.lng }, request.destination];
+      return Response.json({ route: {
+        path,
+        distanceMeters: 3400, durationMillis: 480000,
+        warnings: response.warnings || [],
+      } });
+    }
+    return originalFetch(input, init);
+  };
   const maps = {
     Map: TestMap,
+    Polyline,
     LatLngBounds: Bounds,
     event,
     marker: { AdvancedMarkerElement: AdvancedMarker },

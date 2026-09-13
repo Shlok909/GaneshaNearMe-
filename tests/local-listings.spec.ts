@@ -2,7 +2,6 @@ import {
   emptyTest as test,
   expect,
   readyMap,
-  fillManualSubmission,
   installGeoHarness,
   emitLocation,
 } from "./helpers";
@@ -19,7 +18,7 @@ test("a fresh browser has no seeded listings, uses the supplied logo, and keeps 
   await expect(page.locator(".nearby-count")).toHaveText("0 listed");
   await expect(
     page
-      .getByRole("heading", { name: "No Ganapatis added yet." })
+      .getByRole("heading", { name: "No Ganapatis have been listed yet." })
       .filter({ visible: true }),
   ).toBeVisible();
   await expect(
@@ -36,9 +35,14 @@ test("a fresh browser has no seeded listings, uses the supplied logo, and keeps 
   await expect(
     page.getByRole("img", { name: "Your live location" }),
   ).toBeVisible();
-  await expect(page.locator(".map-empty")).toHaveCount(0);
+  await expect(page.locator(".map-empty")).toBeVisible();
+  expect(await page.getByRole("img", { name: "Your live location" }).evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const top = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
+    return !top?.closest(".map-empty");
+  })).toBe(true);
   await page
-    .getByRole("link", { name: "Add a Ganapati", exact: true })
+    .getByRole("link", { name: "Share Your Ganapati", exact: true })
     .filter({ visible: true })
     .click();
   await expect(page).toHaveURL(/\/add$/);
@@ -62,7 +66,7 @@ test("first-listing actions stay above fixed navigation on short mobile and tabl
     await page.goto("/home");
     await readyMap(page);
     const action = page
-      .getByRole("link", { name: "Add a Ganapati", exact: true })
+      .getByRole("link", { name: "Share Your Ganapati", exact: true })
       .filter({ visible: true });
     const actionBox = await action.boundingBox();
     const navBox = await page
@@ -78,51 +82,4 @@ test("first-listing actions stay above fixed navigation on short mobile and tabl
       ),
     ).toBe(true);
   }
-});
-
-test("local submissions persist across reload, sync with admin in another tab, and can be saved", async ({
-  page,
-  context,
-}) => {
-  await fillManualSubmission(page, "My Local Ganapati");
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati has been submitted for review.",
-    }),
-  ).toBeVisible();
-  await page.goto("/home");
-  await readyMap(page);
-  await expect(page.locator(".modak-map-marker")).toHaveCount(0);
-
-  const admin = await context.newPage();
-  await admin.goto("/admin");
-  await expect(admin.locator(".request-card")).toHaveCount(1);
-  await admin
-    .getByRole("button", { name: "Approve My Local Ganapati as Community" })
-    .click();
-  await expect(page.locator(".modak-map-marker")).toHaveCount(1);
-  await admin.close();
-  await page.reload();
-  await readyMap(page);
-  await expect(page.locator(".modak-map-marker")).toHaveCount(1);
-  await page.getByLabel("Search an area or Ganapati").fill("My Local");
-  await page.getByRole("option").getByRole("button").click();
-  await expect(page.getByRole("dialog")).toContainText("My Local Ganapati");
-  await page
-    .getByRole("dialog")
-    .getByRole("button", { name: "Save", exact: true })
-    .click();
-  await page.keyboard.press("Escape");
-  await page.getByRole("link", { name: "Saved", exact: true }).click();
-  await expect(page).toHaveURL(/\/saved$/);
-  await page.reload();
-  await expect(
-    page.getByRole("heading", { name: "My Local Ganapati", exact: true }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
-    ),
-  ).toHaveLength(1);
 });

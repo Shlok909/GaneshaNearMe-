@@ -18,12 +18,14 @@ import {
   getSubmissionFieldErrors,
   PUBLIC_ACCESS_MESSAGE,
 } from "@/lib/submission-eligibility";
-import { createLocalSubmission } from "@/lib/demo-submissions";
+import { submitPandal, type DraftAttempt } from "@/lib/submit-pandal";
+import { normalizeIndianPhone } from "@/lib/submission-eligibility";
+import { announcePandalChange, usePandalData } from "./PandalDataProvider";
 import { parseCoordinates } from "@/lib/maps-links";
 import type { Coordinates, SubmissionStatus } from "@/lib/types";
-import { evaluateGanapatiSubmission } from "@/lib/submission-verification";
+
 import { LocationPickerField } from "./LocationPickerField";
-import { useFeedback } from "./ui/Feedback";
+
 import { ImagePicker } from "./ImagePicker";
 import { AppLogo } from "./Brand";
 
@@ -32,7 +34,11 @@ export function AddPandalForm() {
   const [ganapatiPhotos, setGanapatiPhotos] = useState(0);
   const [decorationPhotos, setDecorationPhotos] = useState(0);
   const [submitted, setSubmitted] = useState<SubmissionStatus | null>(null);
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const attempt = useRef<DraftAttempt | null>(null);
+  const [draftLocked, setDraftLocked] = useState(false);
+  const [published, setPublished] = useState(false);
+  const [progress, setProgress] = useState("");
+  const { userId } = usePandalData();
   const [locationText, setLocationText] = useState("");
   const [coordinates, setCoordinates] = useState<Coordinates | null>(null);
   const [coordinateSource, setCoordinateSource] = useState<
@@ -45,7 +51,7 @@ export function AddPandalForm() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const savingRef = useRef(false);
-  const notify = useFeedback();
+
   function updateLocationText(text: string) {
     setLocationText(text);
     const parsed = parseCoordinates(text);
@@ -78,7 +84,14 @@ export function AddPandalForm() {
     event.preventDefault();
     if (savingRef.current) return;
     const data = new FormData(event.currentTarget);
-    const value = (key: string) => String(data.get(key) ?? "").trim();
+    const frozen = attempt.current?.details;
+    const original: Record<string, unknown> = frozen ? {
+      mandalName: frozen.mandal_name, name: frozen.submitter_name,
+      role: frozen.submitter_role === "volunteer" ? "Volunteer" : "Mandal Organizer",
+      phone: frozen.contact_phone, isPublic: frozen.public_access ? "yes" : "no",
+      area: frozen.area, theme: frozen.theme, description: frozen.description,
+    } : {};
+    const value = (key: string) => String(frozen ? original[key] ?? "" : data.get(key) ?? "").trim();
     const details = {
       mandalName: value("mandalName"),
       coordinates,
@@ -89,46 +102,35 @@ export function AddPandalForm() {
       ganapatiPhotoCount: ganapatiPhotos,
       decorationPhotoCount: decorationPhotos,
     };
-    const result = evaluateGanapatiSubmission(details);
     const nextErrors = getSubmissionFieldErrors(details);
-    if (result.status === "approved" && !coordinates) {
-      setErrors({ coordinates: nextErrors.coordinates });
-      document.getElementById("coordinates")?.focus();
+    if (!value("isPublic")) nextErrors.isPublic = "Please choose whether the celebration is public.";
+    if (Object.keys(nextErrors).length) {
+      setErrors(nextErrors);
+      document.getElementById(Object.keys(nextErrors)[0])?.focus();
       return;
     }
-    setErrors(result.status === "rejected" ? nextErrors : {});
+    setErrors({});
     savingRef.current = true;
     setSaving(true);
     setSaveError("");
-    try {
-      const { submission, persisted } = await createLocalSubmission(
-        {
-          mandalName: details.mandalName,
-          locationText: locationText.trim(),
-          coordinates,
-          submitterName: details.submitterName,
-          submitterRole: details.submitterRole,
-          contact: details.contact,
-          publicAccess: details.publicAccess,
-          ganapatiImages: {
-            names: ganapatiFiles.map((file) => file.name),
-            count: ganapatiPhotos,
-          },
-          decorationImages: {
-            names: decorationFiles.map((file) => file.name),
-            count: decorationPhotos,
-          },
+    if (!attempt.current) {
+      attempt.current = {
+        id: crypto.randomUUID(), uploads: new Map(),
+        details: {
+          submitted_by: userId, mandal_name: details.mandalName, area: value("area"),
+          location_text: locationText.trim(), latitude: coordinates!.lat, longitude: coordinates!.lng,
+          submitter_name: details.submitterName, submitter_role: details.submitterRole === "Volunteer" ? "volunteer" : "organizer",
+          contact_phone: normalizeIndianPhone(details.contact), public_access: details.publicAccess,
+          theme: value("theme") || null, description: value("description") || null,
         },
-        submissionId,
-        { ganapati: ganapatiFiles, decoration: decorationFiles },
-      );
-      if (!persisted)
-        notify(
-          "Saved for this visit only. Browser storage is unavailable.",
-          "info",
-        );
-      setSubmissionId(submission.id);
-      setSubmitted(submission.verificationStatus);
+      };
+    }
+    setDraftLocked(true);
+    try {
+      const result = await submitPandal(attempt.current, { ganapati: ganapatiFiles, decoration: decorationFiles }, setProgress);
+      setSubmitted(result.submission_status as SubmissionStatus);
+      setPublished(result.published);
+      announcePandalChange();
       window.scrollTo({ top: 0, behavior: "instant" });
     } catch (error) {
       setSaveError(
@@ -141,7 +143,7 @@ export function AddPandalForm() {
       setSaving(false);
     }
   }
-  if (submitted && submitted !== "rejected")
+  if (submitted)
     return (
       <div className="submission-success" role="status">
         <div className="success-symbol">
@@ -154,19 +156,17 @@ export function AddPandalForm() {
         <h1>
           {submitted === "approved"
             ? "Your Ganapati submission has been approved."
-            : "Your Ganapati has been submitted for review."}
+            : submitted === "rejected" ? "We couldn’t accept this submission." : "Your Ganapati has been submitted for review."}
         </h1>
         <p>
-          {submitted === "approved"
-            ? "Your public Ganapati is available on this browser’s map."
-            : "Our team needs to verify a few details before the listing can be published."}
+          {published ? "Your public Ganapati is now available on the map." : submitted === "approved" ? "Your submission is approved. Private celebrations stay off the public map." : submitted === "rejected" ? "You can review your submission history on your profile and start a new submission with complete details." : "Our team will review the details before the listing can be published."}
         </p>
         <div className="success-note">
           <ClipboardCheck size={22} />
           <span>
             {publicAccess === "no"
               ? "Private celebrations will not appear on the public map."
-              : "Saved locally in this browser for the Stage 2 preview."}
+              : "Your submission is saved to your account."}
           </span>
         </div>
         <Link href="/home" className="button button-primary">
@@ -185,28 +185,6 @@ export function AddPandalForm() {
         <h1>Share Your Ganapati</h1>
         <p>Tell us about your public Ganapati pandal.</p>
       </div>
-      {submitted === "rejected" && (
-        <div className="submission-rejected" role="alert">
-          <h2>
-            We couldn&apos;t accept this listing based on the information
-            provided.
-          </h2>
-          <p>
-            Your details are still here. Review them and submit again when
-            ready.
-          </p>
-          <button
-            type="button"
-            className="button button-secondary button-small"
-            onClick={() => {
-              setSubmitted(null);
-              document.getElementById("mandalName")?.focus();
-            }}
-          >
-            Review and edit details
-          </button>
-        </div>
-      )}
       <div className="submission-layout">
         <form
           className="submission-form"
@@ -224,6 +202,7 @@ export function AddPandalForm() {
             <p className="form-required-note">
               Fields marked <span>*</span> are required.
             </p>
+            <fieldset disabled={draftLocked}>
             <section className="form-section">
               <div className="form-section-heading">
                 <span>01</span>
@@ -238,8 +217,12 @@ export function AddPandalForm() {
                 placeholder="e.g. Shree Ganesh Utsav Mandal"
                 error={errors.mandalName}
               />
+              <FormField id="area" label="Area / Neighbourhood" placeholder="e.g. Dharampeth, Nagpur" maxLength={160} required={false} />
+              <FormField id="theme" label="Theme" placeholder="What makes your celebration special?" maxLength={500} required={false} />
+              <FormField id="description" label="Description" placeholder="A little about your Ganapati" maxLength={2000} required={false} />
               <FormField
                 id="location"
+                maxLength={1000}
                 label="Exact Location"
                 placeholder="Paste Google Maps link or type location"
                 value={locationText}
@@ -319,6 +302,7 @@ export function AddPandalForm() {
                 hint="A mobile number for questions about your submission."
               />
             </section>
+            </fieldset>
             <section className="form-section">
               <div className="form-section-heading">
                 <span>03</span>
@@ -353,7 +337,7 @@ export function AddPandalForm() {
               </div>
             </section>
             <section className="form-section last-section">
-              <fieldset>
+              <fieldset disabled={draftLocked}>
                 <legend className="field-label public-question">
                   Is this open to the general public?
                   <span className="required-mark"> *</span>
@@ -382,6 +366,7 @@ export function AddPandalForm() {
                 )}
               </fieldset>
             </section>
+            {draftLocked && !saving && <p className="field-hint">Your draft details are locked. You can adjust the photos and retry this same submission.</p>}
             {saveError && (
               <p className="photo-save-error" role="alert">
                 {saveError}
@@ -393,7 +378,7 @@ export function AddPandalForm() {
                 Only public Ganapatis can appear on the map.
               </p>
               <button type="submit" className="button button-primary">
-                {saving ? "Saving photos…" : "Submit Ganapati"}
+                {saving ? progress || "Saving…" : draftLocked ? "Retry submission" : "Submit Ganapati"}
                 <ArrowRight size={18} />
               </button>
             </div>

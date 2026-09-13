@@ -1,290 +1,90 @@
 import type { Locator, Page } from "@playwright/test";
 import { emptyTest as test, expect, fillSubmission, readyMap } from "./helpers";
-import {
-  ganapatiPhoto,
-  secondGanapatiPhoto,
-  decorationPhoto,
-  secondDecorationPhoto,
-} from "./fixtures/photos";
+import { ganapatiPhoto, decorationPhoto } from "./fixtures/photos";
 
-async function expectPhoto(
-  page: Page,
-  image: Locator,
-  file: typeof ganapatiPhoto,
-) {
-  await expect(image).toHaveAttribute("src", /^blob:/);
-  await expect
-    .poll(() =>
-      image.evaluate(
-        (element: HTMLImageElement) =>
-          element.complete && element.naturalWidth > 0,
-      ),
-    )
-    .toBe(true);
-  const bytes = await page.evaluate(
-    async (url) =>
-      Array.from(new Uint8Array(await (await fetch(url!)).arrayBuffer())),
-    await image.getAttribute("src"),
-  );
+const service = "http://127.0.0.1:54329";
+async function expectPhoto(page: Page, image: Locator, file: typeof ganapatiPhoto) {
+  await expect(image).toHaveAttribute("src", /\/storage\/v1\/object\/sign\/pandal-images\//);
+  await expect.poll(() => image.evaluate((element: HTMLImageElement) => element.complete && element.naturalWidth > 0)).toBe(true);
+  const bytes = await page.evaluate(async url => Array.from(new Uint8Array(await (await fetch(url!)).arrayBuffer())), await image.getAttribute("src"));
   expect(Buffer.from(bytes)).toEqual(file.buffer);
 }
-async function submitPhotos(page: Page, name = "Photo Test Mandal") {
-  await fillSubmission(page, name);
+
+test("uploaded bytes stay in the Ganapati and decoration groups after reload and saving", async ({ page, request }, testInfo) => {
+  await fillSubmission(page, "Photo Test Mandal");
   await page.getByRole("button", { name: "Remove ganapati.png" }).click();
   await page.getByRole("button", { name: "Remove decoration.png" }).click();
-  await page
-    .locator('input[name="ganapati-photos"]')
-    .setInputFiles([ganapatiPhoto, secondGanapatiPhoto]);
-  await page
-    .locator('input[name="decoration-photos"]')
-    .setInputFiles([
-      decorationPhoto,
-      secondDecorationPhoto,
-      { ...decorationPhoto, name: "decoration-third.png" },
-    ]);
+  await page.locator('input[name="ganapati-photos"]').setInputFiles(ganapatiPhoto);
+  await page.locator('input[name="decoration-photos"]').setInputFiles(decorationPhoto);
   await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati submission has been approved.",
-    }),
-  ).toBeVisible();
-  const record = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("gnm_demo_submissions")!)[0],
-  );
-  await page.goto(`/home?pandal=${record.id}`);
+  await expect(page.getByRole("heading", { name: "Your Ganapati submission has been approved." })).toBeVisible();
+  const state = await (await request.get(service + "/__test/state")).json();
+  expect(state.tables.pandal_submissions).toHaveLength(1);
+  const record = state.tables.pandal_submissions[0];
+  expect(record.status).toBe("approved");
+  expect(record.verification_score).toBe(11);
+  expect(record.ganapati_image_paths[0]).toContain("/ganapati/");
+  expect(record.pandal_image_paths[0]).toContain("/pandal/");
+  await page.goto("/home?pandal=" + record.id);
   await readyMap(page);
-  return record;
-}
-
-test("uploaded photo bytes stay in their Ganapati and decoration groups after reload and in Saved and Admin", async ({
-  page,
-}, testInfo) => {
-  const record = await submitPhotos(page);
-  expect(record.photoSetId).toMatch(/^photos-/);
-  expect(record.ganapatiImages.names).toEqual([
-    ganapatiPhoto.name,
-    secondGanapatiPhoto.name,
-  ]);
-  expect(record.decorationImages.count).toBe(3);
-  const sheet = page.getByRole("dialog");
-  await expectPhoto(page, sheet.locator(".preview-hero img"), ganapatiPhoto);
-  await expect(
-    sheet
-      .getByRole("region", { name: "Ganapati photos", exact: true })
-      .getByRole("button"),
-  ).toHaveCount(2);
-  await expect(
-    sheet
-      .getByRole("region", { name: "Decoration photos", exact: true })
-      .getByRole("button"),
-  ).toHaveCount(3);
-  await sheet
-    .getByRole("button", { name: "View Ganapati photo 2", exact: true })
-    .click();
-  await expectPhoto(
-    page,
-    sheet.locator(".preview-hero img"),
-    secondGanapatiPhoto,
-  );
-  await sheet
-    .getByRole("button", { name: "View Decoration photo 1", exact: true })
-    .click();
-  await expectPhoto(page, sheet.locator(".preview-hero img"), decorationPhoto);
-  await sheet
-    .getByRole("button", { name: "View Decoration photo 2", exact: true })
-    .click();
-  await expectPhoto(
-    page,
-    sheet.locator(".preview-hero img"),
-    secondDecorationPhoto,
-  );
-  await page.screenshot({
-    path: testInfo.outputPath("grouped-photos.png"),
-    fullPage: true,
-  });
+  const hero = page.locator(".preview-hero img");
+  await expectPhoto(page, hero, ganapatiPhoto);
+  await page.getByRole("button", { name: "View Decoration photo 1" }).click();
+  await expectPhoto(page, hero, decorationPhoto);
   await page.reload();
-  await expectPhoto(page, sheet.locator(".preview-hero img"), ganapatiPhoto);
-  await sheet
-    .getByRole("button", { name: "View Decoration photo 1", exact: true })
-    .click();
-  await expectPhoto(page, sheet.locator(".preview-hero img"), decorationPhoto);
-  await sheet.getByRole("button", { name: "Save", exact: true }).click();
-  await page.keyboard.press("Escape");
-  await expect(sheet).toHaveCount(0);
-  await expect(page).toHaveURL(/\/home$/);
-  await page.getByRole("link", { name: "Saved", exact: true }).click();
-  await expect(page).toHaveURL(/\/saved$/);
-  await page.reload();
-  await expectPhoto(
-    page,
-    page.locator(".pandal-card-image img"),
-    ganapatiPhoto,
-  );
-  await page.goto("/admin");
-  await page.getByRole("button", { name: /^Approved/ }).click();
-  await expectPhoto(
-    page,
-    page.locator(".request-photos img").first(),
-    ganapatiPhoto,
-  );
-  await expectPhoto(
-    page,
-    page.locator(".request-photos img").last(),
-    decorationPhoto,
-  );
-  await page.getByRole("button", { name: "Review Photo Test Mandal" }).click();
-  await sheet
-    .getByRole("button", { name: "View Decoration photo 1", exact: true })
-    .click();
-  await expectPhoto(
-    page,
-    sheet.locator(".review-photo-hero img"),
-    decorationPhoto,
-  );
-  expect(await page.evaluate(() => JSON.stringify(localStorage))).not.toMatch(
-    /blob:|data:image|base64/,
-  );
+  await expectPhoto(page, hero, ganapatiPhoto);
+  await page.getByRole("dialog").getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("dialog").getByRole("button", { name: "Saved", exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath("supabase-photos.png"), fullPage: true });
+  await page.goto("/saved");
+  await expectPhoto(page, page.locator(".pandal-card-image img"), ganapatiPhoto);
+  expect(await page.evaluate(() => localStorage.getItem("gnm_demo_submissions"))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem("gnm_saved_pandals"))).toBeNull();
 });
 
-test("legacy listings can receive photos without duplication, and replacing one group preserves the other across tabs", async ({
-  page,
-  context,
-}) => {
-  await fillSubmission(page, "Existing Local Mandal");
-  await page.getByRole("button", { name: "Remove ganapati.png" }).click();
+test("both image groups are required and a private approval is never published", async ({ page, request }) => {
+  await fillSubmission(page, "Private Test Mandal");
   await page.getByRole("button", { name: "Remove decoration.png" }).click();
+  await page.getByRole("radio", { name: "No, it’s a private celebration" }).check();
   await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati submission has been approved.",
-    }),
-  ).toBeVisible();
-  const prior = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("gnm_demo_submissions")!)[0],
-  );
-  await page.goto(`/home?pandal=${prior.id}`);
-  await readyMap(page);
-  await page.getByRole("button", { name: "Add or update photos" }).click();
-  let editor = page.getByRole("form", { name: "Update listing photos" });
-  await editor
-    .getByLabel("Ganapati Photos", { exact: true })
-    .setInputFiles(ganapatiPhoto);
-  await editor
-    .getByLabel("Decoration Photos", { exact: true })
-    .setInputFiles(decorationPhoto);
-  await editor.getByRole("button", { name: "Save photos" }).click();
-  await expectPhoto(page, page.locator(".preview-hero img"), ganapatiPhoto);
-
-  const admin = await context.newPage();
-  await admin.goto("/admin");
-  await admin.getByRole("button", { name: /^Approved/ }).click();
-  await admin
-    .getByRole("button", { name: "Review Existing Local Mandal" })
-    .click();
-  await admin.getByRole("button", { name: "Add or update photos" }).click();
-  editor = admin.getByRole("form", { name: "Update listing photos" });
-  await editor
-    .getByLabel("Ganapati Photos", { exact: true })
-    .setInputFiles(secondGanapatiPhoto);
-  await editor.getByRole("button", { name: "Save photos" }).click();
-  await expectPhoto(
-    page,
-    page.locator(".preview-hero img"),
-    secondGanapatiPhoto,
-  );
-  await admin.close();
-  await page.reload();
-  await expectPhoto(
-    page,
-    page.locator(".preview-hero img"),
-    secondGanapatiPhoto,
-  );
-  await page
-    .getByRole("button", { name: "View Decoration photo 1", exact: true })
-    .click();
-  await expectPhoto(page, page.locator(".preview-hero img"), decorationPhoto);
-  const records = await page.evaluate(() =>
-    JSON.parse(localStorage.getItem("gnm_demo_submissions")!),
-  );
-  expect(records).toHaveLength(1);
-  expect(records[0]).toMatchObject({
-    id: prior.id,
-    verificationStatus: prior.verificationStatus,
-    category: prior.category,
-    coordinates: prior.coordinates,
-    submittedAt: prior.submittedAt,
-  });
+  await expect(page.getByText("Upload 1–3 Pandal/Decoration photos.")).toBeVisible();
+  expect((await (await request.get(service + "/__test/state")).json()).tables.pandal_submissions).toHaveLength(0);
+  await page.locator('input[name="decoration-photos"]').setInputFiles(decorationPhoto);
+  await page.getByRole("button", { name: "Submit Ganapati" }).click();
+  await expect(page.getByRole("heading", { name: "Your Ganapati submission has been approved." })).toBeVisible();
+  await expect(page.getByText("Your submission is approved. Private celebrations stay off the public map.")).toBeVisible();
+  const state = await (await request.get(service + "/__test/state")).json();
+  expect(state.tables.pandals).toHaveLength(0);
+  expect(state.tables.pandal_submissions[0].verification_score).toBe(10);
+  await page.goto("/profile");
+  await page.getByText("My Submissions", { exact: false }).first().click();
+  await expect(page.locator(".my-submissions-list")).toContainText("Private Test Mandal");
+  await expect(page.locator(".my-submissions-list")).not.toContainText("score");
 });
 
-test("photo storage failure retains selected files and prevents false publication until retry succeeds", async ({
-  page,
-}) => {
-  await page.addInitScript(() => {
-    const original = IDBFactory.prototype.open;
-    IDBFactory.prototype.open = function (
-      ...args: Parameters<IDBFactory["open"]>
-    ) {
-      if (document.documentElement.dataset.blockPhotos === "true")
-        throw new DOMException("Blocked for test", "QuotaExceededError");
-      return original.apply(this, args);
-    };
+test.describe("recoverable upload failures", () => {
+  test.use({ expectedHttpErrors: [503] });
+  test("partial upload retries the same draft and preserves completed photos", async ({ page, request }) => {
+    await request.post(service + "/__test/settings", { data: { faults: { upload: true, uploadGroup: "pandal" } } });
+    await fillSubmission(page, "Retry Test Mandal");
+    await page.getByRole("button", { name: "Submit Ganapati" }).click();
+    await expect(page.locator(".photo-save-error")).toContainText("Your draft and completed uploads are saved");
+    let state = await (await request.get(service + "/__test/state")).json();
+    expect(state.tables.pandal_submissions).toHaveLength(1);
+    const id = state.tables.pandal_submissions[0].id;
+    expect(state.tables.pandal_submissions[0].status).toBe("draft");
+    expect(state.tables.pandals).toHaveLength(0);
+    expect(state.objects).toHaveLength(1);
+    const path = state.objects[0].name;
+    await expect(page.getByLabel("Mandal Name")).toBeDisabled();
+    await request.post(service + "/__test/settings", { data: { faults: { upload: false } } });
+    await page.getByRole("button", { name: "Retry submission" }).click();
+    await expect(page.getByRole("heading", { name: "Your Ganapati submission has been approved." })).toBeVisible();
+    state = await (await request.get(service + "/__test/state")).json();
+    expect(state.tables.pandal_submissions).toHaveLength(1);
+    expect(state.tables.pandal_submissions[0].id).toBe(id);
+    expect(state.tables.pandals).toHaveLength(1);
+    expect(state.objects).toHaveLength(2);
+    expect(state.objects.map((object: { name: string }) => object.name)).toContain(path);
   });
-  await fillSubmission(page, "Retry Photo Mandal");
-  await page.evaluate(() => {
-    document.documentElement.dataset.blockPhotos = "true";
-  });
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(page.locator(".photo-save-error")).toContainText(
-    "Photos couldn’t be saved in this browser",
-  );
-  await expect(page.getByLabel("Mandal Name")).toHaveValue(
-    "Retry Photo Mandal",
-  );
-  await expect(
-    page.getByRole("button", { name: "Remove ganapati.png" }),
-  ).toBeVisible();
-  expect(
-    await page.evaluate(() => localStorage.getItem("gnm_demo_submissions")),
-  ).toBeNull();
-  await page.evaluate(() => {
-    document.documentElement.dataset.blockPhotos = "false";
-  });
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati submission has been approved.",
-    }),
-  ).toBeVisible();
-});
-
-test("a decoration-only upload never becomes the Ganapati cover", async ({
-  page,
-}) => {
-  await fillSubmission(page, "Decoration Only Mandal");
-  await page.getByRole("button", { name: "Remove ganapati.png" }).click();
-  await page.getByRole("button", { name: "Remove decoration.png" }).click();
-  await page
-    .locator('input[name="decoration-photos"]')
-    .setInputFiles(decorationPhoto);
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati submission has been approved.",
-    }),
-  ).toBeVisible();
-  const id = await page.evaluate(
-    () => JSON.parse(localStorage.getItem("gnm_demo_submissions")!)[0].id,
-  );
-  await page.goto(`/home?pandal=${id}`);
-  await page
-    .getByRole("button", { name: "View Decoration photo 1", exact: true })
-    .waitFor();
-  await expect(page.locator(".preview-hero img")).toHaveAttribute(
-    "src",
-    "/illustrations/pandal.svg",
-  );
-  await page
-    .getByRole("button", { name: "View Decoration photo 1", exact: true })
-    .click();
-  await expectPhoto(page, page.locator(".preview-hero img"), decorationPhoto);
 });

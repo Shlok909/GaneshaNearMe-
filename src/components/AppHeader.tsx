@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MapPin, Plus } from "lucide-react";
 import { Brand } from "./Brand";
+import { AboutDialog } from "./AboutDialog";
 
 export function AppHeader({ initials }: { initials: string }) {
   return (
@@ -13,6 +14,7 @@ export function AppHeader({ initials }: { initials: string }) {
           <span className="location-live" />
         </div>
         <div className="header-actions">
+          <AboutDialog />
           <Link href="/add" className="header-add">
             <Plus size={17} /> List your pandal
           </Link>

@@ -2,6 +2,7 @@
 // It signs real ES256 JWTs so the unmodified SDK verifies claims via JWKS.
 import { createServer } from "node:http";
 import { generateKeyPairSync, randomUUID, sign } from "node:crypto";
+import { resetData, addProfile, configureData, seedData, dataState, handleData } from "./data-server.mjs";
 
 const origin = "http://127.0.0.1:54329";
 const { privateKey, publicKey } = generateKeyPairSync("ec", {
@@ -20,6 +21,7 @@ let users,
   confirmEmail,
   refreshCount;
 function reset() {
+  resetData();
   users = new Map();
   sessions = new Map();
   refreshTokens = new Map();
@@ -42,6 +44,7 @@ function addUser(email, password, fullName, confirmed) {
     identities: [],
   };
   users.set(email, { user, password });
+  addProfile(user);
   return user;
 }
 function sessionFor(user, lifetime = 3600) {
@@ -81,9 +84,10 @@ const server = createServer(async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "http://localhost:3002");
   res.setHeader(
     "Access-Control-Allow-Headers",
-    "authorization, apikey, content-type, x-client-info, x-supabase-api-version",
+    "authorization, apikey, content-type, x-client-info, x-supabase-api-version, prefer, range, range-unit, accept, accept-profile, content-profile, x-upsert, cache-control, x-retry-count",
   );
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,HEAD,POST,PUT,PATCH,DELETE,OPTIONS");
+  res.setHeader("Access-Control-Expose-Headers", "Content-Range");
   res.setHeader("Content-Type", "application/json");
   res.setHeader("X-Supabase-Api-Version", "2024-01-01");
   res.setHeader("Cache-Control", "no-store");
@@ -95,10 +99,12 @@ const server = createServer(async (req, res) => {
   if (req.method === "OPTIONS") return send(204);
   const url = new URL(req.url, origin);
   let body = {};
+  let raw;
   try {
-    let raw = "";
-    for await (const chunk of req) raw += chunk;
-    if (raw) body = JSON.parse(raw);
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    raw = Buffer.concat(chunks);
+    if (raw.length && req.headers["content-type"]?.includes("application/json")) body = JSON.parse(raw.toString());
   } catch {
     return fail("bad_json");
   }
@@ -107,7 +113,8 @@ const server = createServer(async (req, res) => {
     return send(200, { ok: true });
   }
   if (url.pathname === "/__test/settings" && req.method === "POST") {
-    confirmEmail = body.confirmEmail;
+    if (typeof body.confirmEmail === "boolean") confirmEmail = body.confirmEmail;
+    configureData(body, users);
     return send(200, { ok: true });
   }
   if (url.pathname === "/__test/state")
@@ -118,6 +125,7 @@ const server = createServer(async (req, res) => {
         email: user.email,
       })),
       refreshCount,
+      ...dataState(),
     });
   if (url.pathname === "/__test/expired-session" && req.method === "POST")
     return send(200, sessionFor(users.get("explorer@example.com").user, -60));
@@ -159,6 +167,10 @@ const server = createServer(async (req, res) => {
     return send(200, sessionFor(account.user));
   }
   const user = sessions.get(req.headers.authorization?.replace(/^Bearer /, ""));
+  if (url.pathname === "/__test/seed" && req.method === "POST") {
+    seedData(body.pandals, users.get("explorer@example.com").user.id); return send(200, { ok: true });
+  }
+  if (await handleData({ req, res, url, body, raw, user, send })) return;
   if (url.pathname === "/auth/v1/user") {
     if (!user) return fail("bad_jwt", 401);
     if (req.method === "PUT") {

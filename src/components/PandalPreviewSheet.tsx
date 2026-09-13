@@ -12,19 +12,20 @@ import { formatDistance } from "@/lib/geo";
 import { createGoogleMapsDirectionsUrl } from "@/lib/maps-links";
 import { CategoryBadge } from "./CategoryBadge";
 import { useListingPhotos } from "@/hooks/useListingPhotos";
-import type { PhotoKind } from "@/lib/local-photos";
+import type { PhotoKind } from "@/lib/types";
 import { photoLabels, photoPlaceholders } from "./ListingPhoto";
 import { PhotoThumbnails } from "./PhotoThumbnails";
-import { ListingPhotoEditor } from "./ListingPhotoEditor";
 
 export function PandalPreviewSheet({
   pandal,
   onClose,
   returnFocusId,
+  onShowRoute,
 }: {
   pandal: Pandal | null;
   onClose: () => void;
   returnFocusId?: string;
+  onShowRoute?: () => void;
 }) {
   return (
     <Modal
@@ -35,13 +36,13 @@ export function PandalPreviewSheet({
       className="pandal-preview"
       returnFocusId={returnFocusId}
     >
-      {pandal && <PreviewContent key={pandal.id} pandal={pandal} />}
+      {pandal && <PreviewContent key={pandal.id} pandal={pandal} onShowRoute={onShowRoute} />}
     </Modal>
   );
 }
 
-function PreviewContent({ pandal }: { pandal: Pandal }) {
-  const photos = useListingPhotos(pandal.photoSetId);
+function PreviewContent({ pandal, onShowRoute }: { pandal: Pandal; onShowRoute?: () => void }) {
+  const photos = useListingPhotos(pandal.photos);
   const [selection, setSelection] = useState<{
     kind: PhotoKind;
     index: number;
@@ -66,6 +67,7 @@ function PreviewContent({ pandal }: { pandal: Pandal }) {
           sizes="(max-width: 640px) 100vw, 480px"
           priority
           unoptimized
+          onError={selected ? photos.onError : undefined}
         />
         <span className="illustration-label">
           {selected
@@ -81,7 +83,7 @@ function PreviewContent({ pandal }: { pandal: Pandal }) {
             <MapPin size={15} />
             {pandal.area}
           </span>
-          {pandal.verified && <VerifiedBadge label={"Locally approved"} />}
+          {pandal.verified && <VerifiedBadge label="Approved" />}
         </div>
         <h2>{pandal.name}</h2>
         <CategoryBadge category={pandal.category} />
@@ -97,15 +99,16 @@ function PreviewContent({ pandal }: { pandal: Pandal }) {
           photos={photos}
           selected={{ kind: selection.kind, index }}
           onSelect={setSelection}
+          onError={photos.onError}
         />
         {(photos.status === "missing" || photos.status === "error") && (
           <p className="photo-availability-note">
             {photos.status === "error"
-              ? "Saved photos could not be loaded. Check browser storage or attach the originals again."
-              : "No image files are saved for this listing. Earlier submissions kept filenames only; attach the originals below."}
+              ? "Photos could not be loaded. Please retry."
+              : "Photos are not available for this listing."}
+            {photos.status === "error" && <button type="button" className="text-link" onClick={photos.retry}>Retry photos</button>}
           </p>
         )}
-        <ListingPhotoEditor listingId={pandal.id} />
         {pandal.distanceKm !== undefined && (
           <p className="photo-distance">
             <Navigation size={16} />
@@ -115,6 +118,7 @@ function PreviewContent({ pandal }: { pandal: Pandal }) {
         <div className="preview-actions">
           <SaveButton id={pandal.id} />
           <ShareButton id={pandal.id} name={pandal.name} />
+          {onShowRoute && <button type="button" className="button button-primary directions-button" onClick={onShowRoute}><Navigation size={18} />Show route on map</button>}
           <a
             className="button button-secondary directions-button"
             href={createGoogleMapsDirectionsUrl({

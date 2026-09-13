@@ -12,11 +12,13 @@ export function PandalCard({
   pandal,
   onSelect,
   onRemove,
+  removing = false,
   compact = false,
 }: {
   pandal: Pandal;
   onSelect?: () => void;
   onRemove?: () => void;
+  removing?: boolean;
   compact?: boolean;
 }) {
   if (compact && onSelect)
@@ -29,7 +31,7 @@ export function PandalCard({
       >
         <span className="nearby-image">
           <ListingPhoto
-            photoSetId={pandal.photoSetId}
+            paths={pandal.photos}
             name={pandal.name}
             sizes="80px"
           />
@@ -44,7 +46,7 @@ export function PandalCard({
             {formatDistance(pandal.distanceKm)}{" "}
             {pandal.verified && (
               <span>
-                <span className="tiny-dot" /> {"Locally approved"}
+                <span className="tiny-dot" /> Approved
               </span>
             )}
           </span>
@@ -56,11 +58,11 @@ export function PandalCard({
     <article className="pandal-card">
       <div className="pandal-card-image">
         <ListingPhoto
-          photoSetId={pandal.photoSetId}
+          paths={pandal.photos}
           name={pandal.name}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
-        {pandal.verified && <VerifiedBadge label={"Locally approved"} />}
+        {pandal.verified && <VerifiedBadge label="Approved" />}
         <SaveButton id={pandal.id} compact />
       </div>
       <div className="pandal-card-body">
@@ -94,6 +96,7 @@ export function PandalCard({
               className="icon-button remove-button"
               aria-label={`Remove ${pandal.name}`}
               onClick={onRemove}
+              disabled={removing}
             >
               <Trash2 size={18} />
             </button>

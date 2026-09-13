@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { getSupabaseConfig } from "./config";
+import type { Database } from "./database.types";
 import { isProtectedPath, safeNextPath } from "../auth/redirects";
 
 export async function updateSession(request: NextRequest) {
@@ -8,7 +9,7 @@ export async function updateSession(request: NextRequest) {
   const config = getSupabaseConfig();
   let authenticated = false;
   if (config) {
-    const supabase = createServerClient(config.url, config.key, {
+    const supabase = createServerClient<Database>(config.url, config.key, {
       cookies: {
         getAll: () => request.cookies.getAll(),
         setAll(cookiesToSet, headers) {
@@ -51,6 +52,6 @@ export async function updateSession(request: NextRequest) {
   );
   response.headers.set("Pragma", "no-cache");
   response.headers.set("Expires", "0");
-  response.headers.set("Referrer-Policy", "no-referrer");
+  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   return response;
 }

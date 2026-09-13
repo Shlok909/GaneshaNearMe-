@@ -10,7 +10,7 @@ build.on("exit", (code) => {
   if (code) process.exit(code);
   const app = spawn(
     process.execPath,
-    [next, "start", "--hostname", "127.0.0.1", "--port", "3002"],
+    ["--import", "./tests/support/routes-server-double.mjs", next, "start", "--hostname", "127.0.0.1", "--port", "3002"],
     { stdio: "inherit", env: process.env, windowsHide: true },
   );
   app.on("exit", (status) => process.exit(status ?? 0));

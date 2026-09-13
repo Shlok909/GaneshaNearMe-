@@ -1,5 +1,5 @@
 // Browser keys are visible by design. Restrict this key to your website referrers
-// and Maps JavaScript API in Google Cloud; never use it as a server secret.
+// and its intended API in Google Cloud; never use it as a server secret.
 export const DEFAULT_MAP_CENTER = { lat: 21.1458, lng: 79.0882 };
 export const DEFAULT_MAP_ZOOM = 12;
 export const GOOGLE_MAPS_API_KEY =

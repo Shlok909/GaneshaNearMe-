@@ -21,8 +21,9 @@ import type { ProfileUser } from "@/lib/auth/user";
 import { logout, updateProfile } from "@/app/auth/actions";
 import { createClient } from "@/lib/supabase/client";
 import { validateName } from "@/lib/auth/validation";
+import { MySubmissions } from "./MySubmissions";
 
-export function ProfileExperience({ user }: { user: ProfileUser }) {
+export function ProfileExperience({ user, isAdmin, profileError }: { user: ProfileUser; isAdmin: boolean; profileError: string }) {
   const { ids } = useSavedPandals();
   const router = useRouter();
   const pending = useRef(false);
@@ -82,6 +83,7 @@ export function ProfileExperience({ user }: { user: ProfileUser }) {
         <h1>My profile</h1>
       </div>
       <section className="profile-card">
+        {profileError && <div className="data-feedback" role="alert"><p>{profileError}</p><button type="button" className="text-link" onClick={() => router.refresh()}>Retry profile</button></div>}
         <div className="profile-cover">
           <span>गणपती बाप्पा मोरया</span>
         </div>
@@ -162,6 +164,7 @@ export function ProfileExperience({ user }: { user: ProfileUser }) {
           <strong className="profile-count">{ids.length}</strong>
           <ChevronRight size={18} />
         </Link>
+        {isAdmin && <Link href="/admin" className="profile-row"><span className="profile-row-icon"><ClipboardList size={20} /></span><span>GnM Admin<small>Review submissions and manage listings</small></span><ChevronRight size={18} /></Link>}
         <details className="profile-details">
           <summary className="profile-row">
             <span className="profile-row-icon">
@@ -173,11 +176,7 @@ export function ProfileExperience({ user }: { user: ProfileUser }) {
             <ChevronDown size={18} />
           </summary>
           <div className="profile-details-content">
-            <p>
-              Submissions are saved in this browser for local review.
-              Account-linked submission history will be available in a later
-              stage.
-            </p>
+            <MySubmissions />
             <Link href="/add" className="text-link">
               Share your Ganapati
               <ArrowUpRight size={16} />
@@ -201,10 +200,9 @@ export function ProfileExperience({ user }: { user: ProfileUser }) {
               save or share a place you love.
             </p>
             <p>
-              This app shows approved public listings saved in this browser.
-              Location is optional and stays in memory. Saved places and
-              submission metadata stay in this browser; local approval makes a
-              submission visible here.
+              This app shows approved public Ganapatis. Your saves and submissions
+              are linked to your account. Your current location is optional and
+              stays in memory; only a location you choose for a submission is saved.
             </p>
             <Link href="/" className="text-link">
               About GaneshaNearMe

@@ -5,9 +5,11 @@ import { usePublicPandals, useSavedPandals } from "@/lib/hooks";
 import { EmptyState } from "./EmptyState";
 import { PandalCard } from "./PandalCard";
 import { useFeedback } from "./ui/Feedback";
+import { usePandalData } from "./PandalDataProvider";
 
 export function SavedExperience() {
-  const { ids, toggle } = useSavedPandals();
+  const { ids, toggle, pendingIds } = useSavedPandals();
+  const { loading, savesLoading, error, savesError, refresh } = usePandalData();
   const pandals = usePublicPandals();
   const saved = pandals.filter((pandal) => ids.includes(pandal.id));
   const notify = useFeedback();
@@ -28,7 +30,9 @@ export function SavedExperience() {
           <Bookmark size={28} />
         </span>
       </div>
-      {saved.length === 0 ? (
+      {loading || savesLoading ? <p role="status">Loading your saved Ganapatis…</p> : error || savesError ?
+        <div className="data-feedback" role="alert"><p>{error || savesError}</p><button type="button" className="button button-secondary" onClick={refresh}>Retry</button></div>
+      : saved.length === 0 ? (
         <EmptyState />
       ) : (
         <>
@@ -37,14 +41,10 @@ export function SavedExperience() {
               <PandalCard
                 key={pandal.id}
                 pandal={pandal}
-                onRemove={() => {
-                  const persisted = toggle(pandal.id);
-                  notify(
-                    persisted
-                      ? "Removed from your saved Ganapatis"
-                      : "Removed for this visit. Browser storage is unavailable.",
-                    persisted ? "success" : "info",
-                  );
+                removing={pendingIds.includes(pandal.id)}
+                onRemove={async () => {
+                  try { await toggle(pandal.id); notify("Removed from your saved Ganapatis", "success"); }
+                  catch (cause) { notify(cause instanceof Error ? cause.message : "Please try again.", "info"); }
                 }}
               />
             ))}

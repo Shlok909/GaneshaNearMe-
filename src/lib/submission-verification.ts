@@ -26,8 +26,7 @@ export function statusForScore(score: number): SubmissionStatus {
       : "rejected";
 }
 
-// STAGE 3: Enforce this logic securely with database/backend validation.
-// This local score is a moderation simulation, not identity verification.
+// UI explanation only. finalize_pandal_submission computes the authoritative score.
 export function evaluateGanapatiSubmission(input: EligibilityInput) {
   const validity = {
     mandalName: isNonTrivialName(input.mandalName),
@@ -55,12 +54,7 @@ export function evaluateGanapatiSubmission(input: EligibilityInput) {
     (sum, criterion) => sum + criterion.points,
     0,
   );
-  const scoreStatus = statusForScore(totalScore);
-  // Public-access safety takes precedence over automatic publication.
-  const status: SubmissionStatus =
-    scoreStatus === "approved" && !validity.publicAccess
-      ? "manual_review"
-      : scoreStatus;
+  const status = statusForScore(totalScore);
   const reasons = Object.entries(criteria)
     .filter(([, criterion]) => !criterion.valid)
     .map(

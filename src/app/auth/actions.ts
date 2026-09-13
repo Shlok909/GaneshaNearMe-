@@ -57,10 +57,9 @@ export async function updateProfile(data: FormData) {
       await supabase.auth.getUser();
     if (identityError || !identity.user)
       return { error: "Your session has ended. Please sign in again." };
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: name },
-    });
-    if (error) return { error: authErrorMessage(error, "profile") };
+    const { data: profile, error } = await supabase.from("profiles")
+      .update({ full_name: name }).eq("id", identity.user.id).select("id").maybeSingle();
+    if (error || !profile) return { error: "Your profile could not be saved. Please try again." };
     revalidatePath("/", "layout");
     return { success: true };
   } catch {

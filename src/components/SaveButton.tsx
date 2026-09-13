@@ -12,7 +12,7 @@ export function SaveButton({
   id: string;
   compact?: boolean;
 }) {
-  const { ids, toggle } = useSavedPandals();
+  const { ids, toggle, pendingIds, loading, error, refresh } = useSavedPandals();
   const notify = useFeedback();
   const saved = ids.includes(id);
   return (
@@ -26,20 +26,17 @@ export function SaveButton({
         compact ? (saved ? "Remove from saved" : "Save Ganapati") : undefined
       }
       aria-pressed={saved}
-      onClick={() => {
-        const persisted = toggle(id);
-        notify(
-          persisted
-            ? saved
-              ? "Removed from your saved Ganapatis"
-              : "Added to your saved Ganapatis"
-            : "Saved for this visit. Browser storage is unavailable.",
-          persisted ? "success" : "info",
-        );
+      disabled={loading || pendingIds.includes(id)}
+      onClick={async () => {
+        if (error) { refresh(); notify("Retrying your saved list…", "info"); return; }
+        try {
+          await toggle(id);
+          notify(saved ? "Removed from your saved Ganapatis" : "Added to your saved Ganapatis", "success");
+        } catch (cause) { notify(cause instanceof Error ? cause.message : "Please try again.", "info"); }
       }}
     >
       {saved ? <BookmarkCheck size={19} /> : <Bookmark size={19} />}
-      {!compact && (saved ? "Saved" : "Save")}
+      {!compact && (pendingIds.includes(id) ? "Saving…" : error ? "Retry saves" : saved ? "Saved" : "Save")}
     </button>
   );
 }

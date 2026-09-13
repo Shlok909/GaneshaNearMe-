@@ -1,23 +1,19 @@
 import {
   test,
-  emptyTest,
   expect,
   readyMap,
   installGeoHarness,
   emitLocation,
-  fillSubmission,
-  photo,
-  fillManualSubmission,
 } from "./helpers";
 
-test("location is opt-in, moves the blue dot, filters nearby, and cleans up", async ({
+test("location is opt-in, moves the blue dot, keeps every listing, and cleans up", async ({
   page,
 }) => {
   await installGeoHarness(page);
   await page.goto("/home");
   await readyMap(page);
   expect(await page.evaluate(() => window.__testGeo.calls)).toBe(0);
-  await expect(page.getByLabel("Nearby radius")).toBeDisabled();
+  await expect(page.getByLabel("Nearby radius")).toHaveCount(0);
   await expect(page.locator(".modak-map-marker")).toHaveCount(7);
   await page
     .getByRole("button", { name: "Use My Location", exact: true })
@@ -33,9 +29,7 @@ test("location is opt-in, moves the blue dot, filters nearby, and cleans up", as
   await expect(
     page.getByRole("img", { name: "Your live location" }),
   ).toBeVisible();
-  await expect(page.getByLabel("Nearby radius")).toHaveValue("5");
-  await page.getByLabel("Nearby radius").selectOption("1");
-  await expect(page.locator(".modak-map-marker")).toHaveCount(1);
+  await expect(page.locator(".modak-map-marker")).toHaveCount(7);
   const search = page.getByLabel("Search an area or Ganapati");
   await search.fill("Dharampeth");
   await page.getByRole("option").first().getByRole("button").click();
@@ -46,7 +40,6 @@ test("location is opt-in, moves the blue dot, filters nearby, and cleans up", as
   await expect(page.getByRole("dialog")).toContainText(/km away/);
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Clear search" }).click();
-  await page.getByLabel("Nearby radius").selectOption("all");
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
   const canvas = page.locator(".test-map-surface");
   await canvas.focus();
@@ -78,7 +71,7 @@ test("location is opt-in, moves the blue dot, filters nearby, and cleans up", as
   expect(await page.evaluate(() => window.__testGeo.calls)).toBe(1);
 });
 
-test("denied permission, timeout and empty radius remain usable without repeated prompts", async ({
+test("denied permission and timeout remain usable without repeated prompts or distance limits", async ({
   page,
 }) => {
   await installGeoHarness(page);
@@ -125,23 +118,9 @@ test("denied permission, timeout and empty radius remain usable without repeated
   ).toBeVisible();
   await page.getByRole("button", { name: "Try Again", exact: true }).click();
   await emitLocation(page, 19.076, 72.8777);
-  await expect(
-    page
-      .getByText("No listed Ganapatis found within 5 km.")
-      .filter({ visible: true }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Increase Radius" })
-    .filter({ visible: true })
-    .click();
-  await expect(page.getByLabel("Nearby radius")).toHaveValue("10");
-  await page
-    .getByRole("button", { name: "Explore All" })
-    .filter({ visible: true })
-    .click();
   await expect(page.locator(".modak-map-marker")).toHaveCount(7);
   await page.getByRole("button", { name: "Stop using my location" }).click();
-  await expect(page.getByLabel("Nearby radius")).toBeDisabled();
+  await expect(page.getByLabel("Nearby radius")).toHaveCount(0);
   await expect(
     page.getByRole("img", { name: "Your live location" }),
   ).toHaveCount(0);
@@ -244,7 +223,7 @@ test("silent location requests time out and cancel ignores late device callbacks
   await expect(page.locator(".location-feedback")).toHaveCount(0);
 });
 
-test("My Location returns from list view and an empty nearby list cannot cover the blue marker", async ({
+test("My Location returns from list view and distant listings never disappear", async ({
   page,
 }) => {
   await installGeoHarness(page);
@@ -262,14 +241,11 @@ test("My Location returns from list view and an empty nearby list cannot cover t
   const blue = page.getByRole("img", { name: "Your live location" });
   await expect(blue).toBeVisible();
   await expect(page.locator(".map-empty")).toHaveCount(0);
-  await expect(page.getByLabel("Nearby radius")).toHaveValue("5");
+  await expect(page.getByLabel("Nearby radius")).toHaveCount(0);
+  await expect(page.locator(".modak-map-marker")).toHaveCount(7);
   await expect(
     page.getByRole("button", { name: "Fit listed Ganapatis" }),
-  ).toBeDisabled();
-  await page
-    .getByRole("button", { name: "Explore All", exact: true })
-    .filter({ visible: true })
-    .click();
+  ).toBeEnabled();
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
   await page.getByRole("button", { name: "My Location", exact: true }).click();
   const marker = await blue.boundingBox();
@@ -316,10 +292,12 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   page,
   baseURL,
 }) => {
+  await installGeoHarness(page);
   await page.goto("/home");
   await readyMap(page);
   await page.getByRole("button", { name: "Fit listed Ganapatis" }).click();
   await page.locator("#marker-local-fixture-dharampeth").click();
+  await page.getByRole("button", { name: "View details", exact: true }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet).toContainText("Test Dharampeth Cha Raja");
   const directions = new URL(
@@ -390,7 +368,7 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   await sheet.getByRole("button", { name: "Saved", exact: true }).click();
   expect(
     await page.evaluate(() => localStorage.getItem("gnm_saved_pandals")),
-  ).toBe("[]");
+  ).toBeNull();
 });
 
 test("location picker selects and changes points; URL parsing never expands short links", async ({
@@ -462,256 +440,6 @@ test("location picker selects and changes points; URL parsing never expands shor
     '"lat":21.15,',
   );
 });
-
-emptyTest(
-  "photo validation and automatic approval keep image bytes out of localStorage",
-  async ({ page }) => {
-    const posts: string[] = [];
-    page.on("request", (request) => {
-      if (request.method() === "POST") posts.push(request.url());
-    });
-    await page.goto("/add");
-    await page.getByRole("button", { name: "Submit Ganapati" }).click();
-    await expect(
-      page.getByText("Choose an exact location on the map.", { exact: true }),
-    ).toBeVisible();
-    await fillSubmission(page, "Test Approved Mandal");
-    await page.getByRole("button", { name: "Remove ganapati.png" }).click();
-    const upload = page.locator('input[name="ganapati-photos"]');
-    await upload.setInputFiles({
-      name: "bad.txt",
-      mimeType: "text/plain",
-      buffer: Buffer.from("invalid"),
-    });
-    await expect(
-      page.getByText(/Choose JPG, PNG or WebP images up to 5 MB/),
-    ).toBeVisible();
-    await upload.setInputFiles({
-      name: "large.png",
-      mimeType: "image/png",
-      buffer: Buffer.alloc(5 * 1024 * 1024 + 1),
-    });
-    await expect(
-      page.getByText(/Choose JPG, PNG or WebP images up to 5 MB/),
-    ).toBeVisible();
-    await upload.setInputFiles([
-      photo,
-      { ...photo, name: "second.png" },
-      { ...photo, name: "third.png" },
-    ]);
-    await expect(
-      page.getByText("You can add up to 2 photos here."),
-    ).toBeVisible();
-    await expect(
-      page.locator(".image-picker").first().getByRole("img"),
-    ).toHaveCount(2);
-    await page.getByRole("button", { name: "Remove decoration.png" }).click();
-    await page.locator('input[name="decoration-photos"]').setInputFiles(
-      [1, 2, 3, 4].map((index) => ({
-        ...photo,
-        name: `decoration-${index}.png`,
-      })),
-    );
-    await expect(
-      page.getByText("You can add up to 3 photos here."),
-    ).toBeVisible();
-    await expect(
-      page.locator(".image-picker").last().getByRole("img"),
-    ).toHaveCount(3);
-    // A high score must not publish a point-less listing or discard its form.
-    await page
-      .getByLabel("Exact Location", { exact: true })
-      .fill("Near the market");
-    await page.getByRole("button", { name: "Submit Ganapati" }).click();
-    await expect(
-      page.getByText("Choose an exact location on the map.", { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByLabel("Mandal Name")).toHaveValue(
-      "Test Approved Mandal",
-    );
-    await expect(
-      page.locator(".image-picker").first().getByRole("img"),
-    ).toHaveCount(2);
-    await page
-      .getByLabel("Exact Location", { exact: true })
-      .fill("21.1458,79.0882");
-    await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
-    await page.getByRole("button", { name: "Submit Ganapati" }).click();
-    await expect(
-      page.getByRole("heading", {
-        name: "Your Ganapati submission has been approved.",
-      }),
-    ).toBeVisible();
-    const raw = await page.evaluate(() =>
-      localStorage.getItem("gnm_demo_submissions"),
-    );
-    const stored = JSON.parse(raw!).find(
-      (record: { mandalName: string }) =>
-        record.mandalName === "Test Approved Mandal",
-    );
-    expect(stored).toMatchObject({
-      verificationStatus: "approved",
-      score: 11,
-      category: "community",
-      contact: "+919876543210",
-      ganapatiImages: { count: 2 },
-      decorationImages: { count: 3 },
-    });
-    expect(raw).not.toMatch(/blob:|data:image|base64/);
-    expect(posts).toEqual([]);
-    await page.goto(`/home?pandal=${stored.id}`);
-    await readyMap(page);
-    await expect(page.getByRole("dialog")).toContainText(
-      "Test Approved Mandal",
-    );
-    await expect(page.getByRole("dialog")).not.toContainText(
-      /score|11 \/ 11|criteria/i,
-    );
-  },
-);
-
-emptyTest(
-  "rejected submissions preserve entered fields and private high scores stay off the map",
-  async ({ page }) => {
-    await page.goto("/add");
-    await page.getByLabel("Mandal Name").fill("a");
-    await page.getByLabel("Organizer / Mandal Contact").fill("123");
-    await page.getByRole("button", { name: "Submit Ganapati" }).click();
-    await expect(
-      page.getByText(
-        "We couldn't accept this listing based on the information provided.",
-      ),
-    ).toBeVisible();
-    await expect(page.getByLabel("Mandal Name")).toHaveValue("a");
-    await expect(page.getByLabel("Organizer / Mandal Contact")).toHaveValue(
-      "123",
-    );
-    await page.getByRole("button", { name: "Review and edit details" }).click();
-    await page.getByLabel("Mandal Name").fill("Editable Mandal");
-    await page
-      .getByLabel("Exact Location", { exact: true })
-      .fill("21.1458,79.0882");
-    await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
-    await page.getByRole("button", { name: "Submit Ganapati" }).click();
-    await expect(
-      page.getByRole("heading", {
-        name: "Your Ganapati has been submitted for review.",
-        exact: true,
-      }),
-    ).toBeVisible();
-    const edited = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
-    );
-    expect(edited).toHaveLength(1);
-    expect(edited[0]).toMatchObject({
-      score: 5,
-      verificationStatus: "manual_review",
-    });
-    await fillSubmission(page, "Private Home Ganapati");
-    await page
-      .getByRole("radio", { name: "No, it’s a private celebration" })
-      .check();
-    await page.getByRole("button", { name: "Submit Ganapati" }).click();
-    await expect(
-      page.getByText("Private celebrations will not appear on the public map."),
-    ).toBeVisible();
-    const records = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("gnm_demo_submissions") || "[]"),
-    );
-    expect(records[1]).toMatchObject({
-      score: 10,
-      verificationStatus: "manual_review",
-      publicAccess: false,
-    });
-    await page.goto("/home?pandal=" + records[1].id);
-    await readyMap(page);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-    await expect(page.locator(".modak-map-marker")).toHaveCount(0);
-    await page.goto("/admin");
-    await page
-      .getByRole("button", { name: "Review Private Home Ganapati" })
-      .click();
-    await expect(page.getByRole("dialog")).toContainText(
-      "Eligibility Score: 10 / 11",
-    );
-    await expect(
-      page.getByRole("dialog").getByRole("button", {
-        name: "Approve Private Home Ganapati as Featured",
-      }),
-    ).toBeDisabled();
-  },
-);
-
-emptyTest(
-  "local admin approves both categories, rejects, and publishes only approved records",
-  async ({ page }, testInfo) => {
-    for (const name of [
-      "Test Featured Mandal",
-      "Test Community Mandal",
-      "Test Rejected Mandal",
-    ]) {
-      await fillManualSubmission(page, name);
-      await page.getByRole("button", { name: "Submit Ganapati" }).click();
-      await expect(
-        page.getByRole("heading", {
-          name: "Your Ganapati has been submitted for review.",
-        }),
-      ).toBeVisible();
-    }
-    await page.goto("/admin");
-    await expect(page.locator(".request-card")).toHaveCount(3);
-    await page
-      .getByRole("button", { name: "Review Test Featured Mandal" })
-      .click();
-    await expect(page.getByRole("dialog")).toContainText(
-      "Eligibility Score: 5 / 11",
-    );
-    await expect(page.getByRole("dialog")).toContainText("Contact");
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Approve Test Featured Mandal as Featured" })
-      .click();
-    await page
-      .getByRole("button", {
-        name: "Approve Test Community Mandal as Community",
-      })
-      .click();
-    await page
-      .getByRole("button", { name: "Reject Test Rejected Mandal", exact: true })
-      .click();
-    await page.getByRole("button", { name: /^Approved/ }).click();
-    await expect(page.locator(".request-card")).toHaveCount(2);
-    await page.screenshot({
-      path: testInfo.outputPath("admin-approved.png"),
-      fullPage: true,
-    });
-    await page.reload();
-    await page.getByRole("button", { name: /^Rejected/ }).click();
-    await expect(page.locator(".request-card")).toContainText("Not Eligible");
-    await page.goto("/home");
-    await readyMap(page);
-    await expect(page.locator(".modak-map-marker")).toHaveCount(2);
-    await page.getByLabel("Search an area or Ganapati").fill("Test Featured");
-    await page.getByRole("option").getByRole("button").click();
-    const sheet = page.getByRole("dialog");
-    await expect(sheet).toContainText("Featured Public Pandal");
-    await sheet.getByRole("button", { name: "Save", exact: true }).click();
-    await page.keyboard.press("Escape");
-    await page.getByRole("link", { name: "Saved", exact: true }).click();
-    await expect(page).toHaveURL(/\/saved$/);
-    await page.reload();
-    await expect(
-      page.getByRole("heading", { name: "Test Featured Mandal", exact: true }),
-    ).toBeVisible();
-    await page.getByRole("link", { name: "View", exact: true }).click();
-    await expect(page.getByRole("dialog")).toContainText(
-      "Test Featured Mandal",
-    );
-    await page.keyboard.press("Escape");
-    await page.getByLabel("Search an area or Ganapati").fill("Test Rejected");
-    await expect(page.getByRole("listbox").getByRole("option")).toHaveCount(0);
-  },
-);
 
 test("responsive layouts keep map attribution and controls clear of navigation", async ({
   page,
@@ -796,7 +524,7 @@ test("filters and list toggles reuse the same Home map and detach markers on exi
   await page.getByRole("button", { name: "List view" }).click();
   await page.getByRole("button", { name: "Map view" }).click();
   await page.getByRole("button", { name: "Verified", exact: true }).click();
-  await page.getByRole("button", { name: "All nearby", exact: true }).click();
+  await page.getByRole("button", { name: "All Ganapatis", exact: true }).click();
   expect(await page.evaluate(() => window.__testMaps.mapsCreated)).toBe(1);
   expect(await page.evaluate(() => window.__testMaps.imports)).toEqual([
     "maps",

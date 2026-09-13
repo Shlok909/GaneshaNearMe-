@@ -1,25 +1,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 
 import { pandals } from "./fixtures/pandals";
-import type { Submission } from "../src/lib/types";
 import { createServerClient } from "@supabase/ssr";
-
-const fixtureSubmissions: Submission[] = pandals.map((pandal) => ({
-  id: pandal.id,
-  mandalName: pandal.name,
-  locationText: pandal.area,
-  coordinates: pandal.coordinates,
-  submitterName: "Test Organizer",
-  submitterRole: "Organizer",
-  contact: "+919876543210",
-  publicAccess: true,
-  ganapatiImages: { names: ["test.png"], count: 1 },
-  decorationImages: { names: ["test-decoration.png"], count: 1 },
-  score: 11,
-  verificationStatus: "approved",
-  category: pandal.category ?? "community",
-  submittedAt: "2026-09-12T12:00:00.000Z",
-}));
 
 import { installGoogleMapsDouble } from "./google-maps-double";
 
@@ -27,13 +9,19 @@ export const test = base.extend<{
   browserErrors: string[];
   seedListings: boolean;
   authenticated: boolean;
+  admin: boolean;
+  expectedHttpErrors: number[];
   authSession: void;
 }>({
   seedListings: [true, { option: true }],
   authenticated: [true, { option: true }],
+  admin: [false, { option: true }],
+  expectedHttpErrors: [[], { option: true }],
   authSession: [
-    async ({ context, request, authenticated, baseURL }, use) => {
+    async ({ context, request, authenticated, baseURL, seedListings, admin }, use) => {
       await request.post("http://127.0.0.1:54329/__test/reset");
+      if (seedListings) await request.post("http://127.0.0.1:54329/__test/seed", { data: { pandals } });
+      if (admin) await request.post("http://127.0.0.1:54329/__test/settings", { data: { adminEmail: "explorer@example.com" } });
       if (authenticated) {
         const client = createServerClient(
           "http://127.0.0.1:54329",
@@ -75,24 +63,13 @@ export const test = base.extend<{
     { auto: true },
   ],
   browserErrors: [
-    async ({ page, context, seedListings }, use) => {
+    async ({ page, context, expectedHttpErrors }, use) => {
       const errors: string[] = [];
       page.on("pageerror", (error) => errors.push(error.message));
       page.on("console", (message) => {
-        if (message.type() === "error") errors.push(message.text());
+        if (message.type() === "error" && !expectedHttpErrors.some(code => message.text().includes(`status of ${code}`))) errors.push(message.text());
       });
       await context.addInitScript(installGoogleMapsDouble);
-      // Only isolated test contexts receive records. Never overwrite user submissions
-      // created later in a test, including after reload or a route navigation.
-      if (seedListings)
-        await page.addInitScript((records) => {
-          if (localStorage.getItem("gnm_demo_submissions") === null) {
-            localStorage.setItem(
-              "gnm_demo_submissions",
-              JSON.stringify(records),
-            );
-          }
-        }, fixtureSubmissions);
       await page.addInitScript(() => {
         Object.defineProperty(navigator, "share", {
           configurable: true,
@@ -155,6 +132,10 @@ declare global {
       markersRemoved: number;
       failLoads: number;
       imports: string[];
+      routeRequests: { origin: { lat: number; lng: number }; destination: { lat: number; lng: number }; travelMode: string }[];
+      routeResponses: { delay?: number; error?: string; empty?: boolean; warnings?: string[] }[];
+      polylines: { map: unknown; options: { strokeColor: string; path: { lat: number; lng: number }[] } }[];
+      maps: { fittedPoints: { lat: number; lng: number }[] }[];
     };
   }
 }

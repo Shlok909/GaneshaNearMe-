@@ -103,7 +103,7 @@ anonymousTest(
   },
 );
 
-test("profile updates real Auth metadata and header, logout clears cookies and rejects back navigation", async ({
+test("profile updates its database row and header, logout clears cookies and rejects back navigation", async ({
   page,
   context,
   request,
@@ -137,7 +137,7 @@ test("profile updates real Auth metadata and header, logout clears cookies and r
     "Meera Joshi",
   );
   const state = await (await request.get(`${service}/__test/state`)).json();
-  expect(state.users[0].user_metadata.full_name).toBe("Meera Joshi");
+  expect(state.tables.profiles[0].full_name).toBe("Meera Joshi");
   await page.goto("/saved");
   await page.goto("/profile");
   await page.getByRole("button", { name: "Logout", exact: true }).click();

@@ -134,7 +134,7 @@ export function ImagePicker({
       >
         {fileError ||
           error ||
-          `Add 1–${max} clear photos. Images are saved in this browser.`}
+          `Add 1–${max} clear photos. JPEG, PNG or WebP, up to 5 MB each.`}
       </p>
     </div>
   );

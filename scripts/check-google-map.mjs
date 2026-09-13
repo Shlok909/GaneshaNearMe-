@@ -29,22 +29,7 @@ try {
   await page.getByLabel("Password", { exact: true }).fill(process.env.GNM_TEST_PASSWORD);
   await page.getByRole("button", { name: "Login", exact: true }).last().click();
   await expect(page).toHaveURL(/\/home$/);
-  // Create a single local record through the actual form in this isolated context.
-  await page.goto(new URL("/add", target).href);
-  await page.getByLabel("Mandal Name").fill("Map integration check");
-  await page
-    .getByLabel("Exact Location", { exact: true })
-    .fill("21.1458,79.0882");
-  await page.getByLabel("Your Name").fill("Test Organizer");
-  await page.getByRole("radio", { name: "Volunteer", exact: true }).check();
-  await page.getByLabel("Organizer / Mandal Contact").fill("9876543210");
-  await page.getByRole("radio", { name: "Yes, everyone is welcome" }).check();
-  await page.getByRole("button", { name: "Submit Ganapati" }).click();
-  await expect(
-    page.getByRole("heading", {
-      name: "Your Ganapati submission has been approved.",
-    }),
-  ).toBeVisible();
+  // This check reads an existing published listing; it never seeds the live database.
   await page.goto(target);
   await page.locator('[data-map-status="ready"]').waitFor({ timeout: 45000 });
   await page.locator(".modak-map-marker").first().waitFor();
@@ -80,6 +65,7 @@ try {
   });
   const count = await page.locator(".modak-map-marker").count();
   await page.locator("gmp-advanced-marker").first().click();
+  await page.getByRole("button", { name: "View details", exact: true }).click();
   await page.getByRole("dialog").waitFor();
   await page.keyboard.press("Escape");
   await page
@@ -111,7 +97,7 @@ try {
     JSON.stringify(report, null, 2),
   );
   console.log(JSON.stringify(report, null, 2));
-  if (count !== 1 || sdkLoads !== 1 || errors.length) process.exitCode = 1;
+  if (count < 1 || sdkLoads !== 1 || errors.length) process.exitCode = 1;
 } catch (error) {
   console.log(
     JSON.stringify(

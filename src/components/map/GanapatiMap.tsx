@@ -3,11 +3,13 @@ import { useEffect, useRef } from "react";
 import { LocateFixed, Maximize, Minus, Plus } from "lucide-react";
 import type { Pandal } from "@/lib/types";
 import type { UserLocation } from "@/hooks/useUserLocation";
+import type { GanapatiRoute } from "@/hooks/useGanapatiRoute";
 import {
   focusPandal,
   focusUserLocation,
   fitVisiblePandals,
   zoomMap,
+  discoveryMapPadding,
 } from "@/lib/map-camera";
 import { createModakElement } from "./ModakMapMarker";
 import { createUserLocationElement } from "./UserLocationMarker";
@@ -25,6 +27,7 @@ export default function GanapatiMap({
   selected,
   userLocation,
   locateRequest,
+  route,
   onSelect,
   onLocate,
 }: {
@@ -32,6 +35,7 @@ export default function GanapatiMap({
   selected: Pandal | null;
   userLocation: UserLocation | null;
   locateRequest: number;
+  route: GanapatiRoute | null;
   onSelect: (pandal: Pandal) => void;
   onLocate: () => void;
 }) {
@@ -84,7 +88,7 @@ export default function GanapatiMap({
         const marker = new google.maps.marker.AdvancedMarkerElement({
           map,
           position: pandal.coordinates,
-          title: "View " + pandal.name + ", " + pandal.area,
+          title: "Route to " + pandal.name + ", " + pandal.area,
           gmpClickable: true,
           anchorTop: "-50%",
           zIndex: 1,
@@ -150,8 +154,23 @@ export default function GanapatiMap({
     centered.current = true;
     locateVersion.current = locateRequest;
   }, [map, userLocation, locateRequest, selected]);
+  useEffect(() => {
+    if (!map || !route) return;
+    // Draw the provider's path directly. This needs no extra legs/traffic data
+    // and keeps the existing Modak and current-location markers intact.
+    const line = new google.maps.Polyline({
+      map,
+      path: route.route.path?.map(point => ({ lat: point.lat, lng: point.lng })),
+      strokeColor: "#2563eb", strokeOpacity: 1, strokeWeight: 6,
+      clickable: false, zIndex: 5,
+    });
+    fitRoute(map, route);
+    return () => line.setMap(null);
+  }, [map, route]);
   return (
     <section
+      id="ganapati-discovery-map"
+      tabIndex={-1}
       className="real-map"
       aria-label="Map of Ganapati pandals"
       data-map-status={status}
@@ -187,10 +206,13 @@ export default function GanapatiMap({
         <button
           type="button"
           className="icon-button"
-          aria-label="Fit listed Ganapatis"
+          aria-label={route ? "Fit route" : "Fit listed Ganapatis"}
           disabled={!map || !pandals.length}
           onClick={() => {
-            if (map) fitVisiblePandals(map, pandals);
+            if (map) {
+              if (route) fitRoute(map, route);
+              else fitVisiblePandals(map, pandals);
+            }
           }}
         >
           <Maximize size={19} />
@@ -207,10 +229,18 @@ export default function GanapatiMap({
         </button>
       </div>
       <span className="map-data-note">
-        {pandals.length
-          ? "Public Ganapatis · Tap a marker"
+        {route ? "Blue line · Driving route" : pandals.length
+          ? "Public Ganapatis · Tap a Modak for a route"
           : "Your community map"}
       </span>
     </section>
   );
+}
+
+function fitRoute(map: google.maps.Map, result: GanapatiRoute) {
+  const bounds = new google.maps.LatLngBounds();
+  bounds.extend(result.origin);
+  bounds.extend(result.destination);
+  result.route.path?.forEach(point => bounds.extend({ lat: point.lat, lng: point.lng }));
+  map.fitBounds(bounds, discoveryMapPadding(map));
 }

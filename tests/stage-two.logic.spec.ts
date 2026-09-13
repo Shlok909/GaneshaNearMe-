@@ -23,12 +23,7 @@ import {
   isValidIndianPhone,
   type EligibilityInput,
 } from "../src/lib/submission-eligibility";
-import {
-  getPublicPandals,
-  parseSubmissions,
-} from "../src/lib/demo-submissions";
 import { pandals } from "./fixtures/pandals";
-import type { Submission } from "../src/lib/types";
 
 const center = { lat: 21.1458, lng: 79.0882 };
 const eligible: EligibilityInput = {
@@ -121,7 +116,7 @@ test("Indian phone normalization accepts sensible formatting without swallowing 
     "919876543210",
     "00919876543210",
   ]) {
-    expect(normalizeIndianPhone(phone)).toBe("+919876543210");
+    expect(normalizeIndianPhone(phone)).toBe("9876543210");
     expect(isValidIndianPhone(phone)).toBe(true);
   }
   for (const phone of [
@@ -155,9 +150,7 @@ test("all 64 criterion combinations use validated 2/2/2/2/2/1 weights and thresh
     expect(result.totalScore).toBe(score);
     const expected =
       score >= 7
-        ? input.publicAccess
-          ? "approved"
-          : "manual_review"
+        ? "approved"
         : score >= 3
           ? "manual_review"
           : "rejected";
@@ -193,7 +186,7 @@ test("invalid roles, text-only location, partial photos and private access never
   ).toBe(0);
   expect(
     evaluateGanapatiSubmission({ ...eligible, publicAccess: false }),
-  ).toMatchObject({ totalScore: 10, status: "manual_review" });
+  ).toMatchObject({ totalScore: 10, status: "approved" });
   expect(
     evaluateGanapatiSubmission({
       ...eligible,
@@ -221,65 +214,4 @@ test("directions URL encodes only requested valid coordinates and needs no key",
   expect(() =>
     createGoogleMapsDirectionsUrl({ destination: { lat: 999, lng: 0 } }),
   ).toThrow();
-});
-
-test("public discovery starts empty and accepts only approved public coordinates, including legacy migration", () => {
-  expect(getPublicPandals([])).toEqual([]);
-  const record: Submission = {
-    id: "local-test",
-    mandalName: eligible.mandalName,
-    coordinates: center,
-    locationText: "Nagpur",
-    submitterName: "",
-    submitterRole: "",
-    contact: "",
-    publicAccess: true,
-    ganapatiImages: { names: [], count: 0 },
-    decorationImages: { names: [], count: 0 },
-    submittedAt: "2026-09-12T12:00:00.000Z",
-    score: 5,
-    verificationStatus: "manual_review",
-    category: null,
-  };
-  expect(getPublicPandals([record])).toEqual([]);
-  expect(
-    getPublicPandals([{ ...record, verificationStatus: "rejected" }]),
-  ).toEqual([]);
-  const approved = {
-    ...record,
-    verificationStatus: "approved" as const,
-    category: "featured" as const,
-  };
-  expect(getPublicPandals([approved]).at(-1)).toMatchObject({
-    id: record.id,
-    category: "featured",
-  });
-  expect(getPublicPandals([{ ...approved, publicAccess: false }])).toEqual([]);
-  expect(getPublicPandals([{ ...approved, coordinates: null }])).toEqual([]);
-  expect(
-    parseSubmissions(
-      JSON.stringify([record, record, { ...record, id: "bad" }]),
-    ),
-  ).toHaveLength(1);
-  expect(parseSubmissions("not-json")).toEqual([]);
-  expect(
-    parseSubmissions(
-      JSON.stringify([{ ...approved, coordinates: { lat: 91, lng: 0 } }]),
-    ),
-  ).toEqual([]);
-  expect(
-    parseSubmissions(JSON.stringify([{ ...approved, publicAccess: false }]))[0]
-      .verificationStatus,
-  ).toBe("manual_review");
-  const legacy = {
-    ...record,
-    verificationStatus: undefined,
-    category: undefined,
-    status: "pending_review",
-    adminCategory: null,
-  };
-  expect(parseSubmissions(JSON.stringify([legacy]))[0]).toMatchObject({
-    score: 5,
-    verificationStatus: "manual_review",
-  });
 });

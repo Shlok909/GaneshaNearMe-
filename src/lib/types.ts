@@ -1,4 +1,6 @@
 export type Coordinates = { lat: number; lng: number };
+export type PhotoKind = "ganapati" | "decoration";
+export type PhotoPaths = { ganapati: string[]; decoration: string[] };
 export type PandalCategory = "featured" | "community";
 
 export type Pandal = {
@@ -9,7 +11,7 @@ export type Pandal = {
   theme: string;
   image: string;
   gallery: string[];
-  photoSetId?: string;
+  photos?: PhotoPaths;
   verified: boolean;
   coordinates: Coordinates;
   category?: PandalCategory;
@@ -30,8 +32,10 @@ export type Submission = {
   publicAccess: boolean;
   ganapatiImages: PhotoMetadata;
   decorationImages: PhotoMetadata;
-  photoSetId?: string;
   submittedAt: string;
+  photos?: PhotoPaths;
+  possibleDuplicate?: boolean;
+  reviewNotes?: string | null;
   score: number;
   verificationStatus: SubmissionStatus;
   category: PandalCategory | null;

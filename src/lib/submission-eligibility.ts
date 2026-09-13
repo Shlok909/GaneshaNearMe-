@@ -16,14 +16,15 @@ export type EligibilityInput = {
 
 export function normalizeIndianPhone(value: string) {
   const compact = value.trim().replace(/[\s()-]/g, "");
-  if (/^[6-9]\d{9}$/.test(compact)) return `+91${compact}`;
-  if (/^91[6-9]\d{9}$/.test(compact)) return `+${compact}`;
-  if (/^0091[6-9]\d{9}$/.test(compact)) return `+${compact.slice(2)}`;
+  if (/^[6-9]\d{9}$/.test(compact)) return compact;
+  if (/^\+91[6-9]\d{9}$/.test(compact)) return compact.slice(3);
+  if (/^91[6-9]\d{9}$/.test(compact)) return compact.slice(2);
+  if (/^0091[6-9]\d{9}$/.test(compact)) return compact.slice(4);
   return compact;
 }
 
 export function isValidIndianPhone(value: string) {
-  return /^\+91[6-9]\d{9}$/.test(normalizeIndianPhone(value));
+  return /^[6-9]\d{9}$/.test(normalizeIndianPhone(value));
 }
 
 export function isNonTrivialName(value: string, minimumLetters = 3) {
@@ -60,6 +61,5 @@ export function getSubmissionFieldErrors(input: EligibilityInput) {
     input.decorationPhotoCount > 3
   )
     errors["decoration-photos"] = "Upload 1–3 Pandal/Decoration photos.";
-  if (input.publicAccess !== true) errors.isPublic = PUBLIC_ACCESS_MESSAGE;
   return errors;
 }

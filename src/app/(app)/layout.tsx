@@ -1,7 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { BottomNav } from "@/components/BottomNav";
-import { requireUser } from "@/lib/auth/session";
-import { profileFromUser } from "@/lib/auth/user";
+import { getAccount } from "@/lib/auth/account";
+import { PandalDataProvider } from "@/components/PandalDataProvider";
 import { SessionRefresh } from "@/components/SessionRefresh";
 
 export default async function AppLayout({
@@ -9,12 +9,12 @@ export default async function AppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = profileFromUser(await requireUser());
+  const { id, user } = await getAccount();
   return (
     <div className="app-shell">
       <SessionRefresh />
       <AppHeader initials={user.initials} />
-      {children}
+      <PandalDataProvider key={id} userId={id}>{children}</PandalDataProvider>
       <BottomNav />
     </div>
   );

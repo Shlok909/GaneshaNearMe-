@@ -1,9 +1,9 @@
 "use client";
 import { ListingPhoto } from "./ListingPhoto";
-import { ListingPhotoEditor } from "./ListingPhotoEditor";
+
 import { StoredSubmissionPhotos } from "./StoredSubmissionPhotos";
 import Link from "next/link";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   CalendarDays,
   Check,
@@ -19,11 +19,10 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { useDemoSubmissions } from "@/lib/hooks";
-import {
-  reviewLocalSubmission,
-  verificationInput,
-} from "@/lib/demo-submissions";
+import { useAdminSubmissions } from "@/hooks/useAdminSubmissions";
+import { createClient } from "@/lib/supabase/client";
+import { announcePandalChange } from "./PandalDataProvider";
+
 import {
   CRITERIA,
   MAX_SUBMISSION_SCORE,
@@ -42,7 +41,10 @@ const statuses: Record<SubmissionStatus, string> = {
 };
 
 export function AdminDashboard() {
-  const requests = useDemoSubmissions();
+  const { requests, totalUsers, error, ready, refresh } = useAdminSubmissions();
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  const [notes, setNotes] = useState("");
   const [tab, setTab] = useState<SubmissionStatus>("manual_review");
   const [reviewId, setReviewId] = useState<string | null>(null);
   const [returnFocusId, setReturnFocusId] = useState("admin-tab-manual_review");
@@ -59,27 +61,20 @@ export function AdminDashboard() {
       (request) => request.verificationStatus === "rejected",
     ).length,
   };
-  function update(id: string, category: PandalCategory | "reject") {
-    const result = reviewLocalSubmission(id, category);
-    if (!result.updated) {
-      notify(
-        result.reason ??
-          "This request cannot be approved. Review its current details.",
-        "info",
-      );
-      return;
-    }
-    setReturnFocusId(`admin-tab-${tab}`);
-    setReviewId(null);
-    notify(
-      result.persisted
-        ? category === "reject"
-          ? "Request marked Not Eligible"
-          : `Approved as ${category === "featured" ? "Featured" : "Community"}. It is now on this browser’s map.`
-        : "Updated for this visit only. Browser storage is unavailable.",
-      result.persisted ? "success" : "info",
-    );
+  async function update(id: string, category: PandalCategory | "reject") {
+    if (pending.current) return;
+    pending.current = true; setBusy(true);
+    try {
+      const { error } = await createClient().rpc("review_pandal_submission", { p_submission_id: id, p_decision: category, p_notes: id === reviewId ? notes || undefined : undefined });
+      if (error) throw new Error(error.code === "42501" ? "Administrator access is required. Reload to check your account." : "The review could not be saved. Please retry.");
+      setReturnFocusId(`admin-tab-${tab}`); setReviewId(null); setNotes("");
+      announcePandalChange();
+      notify(category === "reject" ? "Submission rejected and removed from public listings." : "Submission approved. Public celebrations are now published.", "success");
+    } catch (cause) { notify(cause instanceof Error ? cause.message : "Please retry the review.", "info"); }
+    finally { pending.current = false; setBusy(false); }
   }
+  if (!ready) return <p role="status">Loading the review dashboard…</p>;
+  if (error) return <div className="data-feedback" role="alert"><p>{error}</p><button className="button button-secondary" type="button" onClick={refresh}>Retry</button></div>;
   return (
     <>
       <div className="page-heading admin-heading">
@@ -97,8 +92,7 @@ export function AdminDashboard() {
       </div>
       <div className="admin-preview-note">
         <span className="tiny-dot" />
-        Local review preview · Decisions affect only this browser. Any signed-in
-        user can access this preview; admin permissions are coming in Part 2.
+        Reviews update the shared listings. Private celebrations remain off the public map.
       </div>
       <div className="admin-stats">
         {[
@@ -121,8 +115,8 @@ export function AdminDashboard() {
             color: "red",
           },
           {
-            label: "Total Submissions",
-            count: requests.length,
+            label: "Total Users",
+            count: totalUsers,
             icon: Users,
             color: "neutral",
           },
@@ -163,14 +157,14 @@ export function AdminDashboard() {
               <div className="request-photos">
                 <div>
                   <ListingPhoto
-                    photoSetId={request.photoSetId}
+                    paths={request.photos}
                     name={request.mandalName}
                     sizes="180px"
                   />
                 </div>
                 <div>
                   <ListingPhoto
-                    photoSetId={request.photoSetId}
+                    paths={request.photos}
                     name={request.mandalName}
                     kind="decoration"
                     sizes="100px"
@@ -203,6 +197,7 @@ export function AdminDashboard() {
                 </p>
                 <p className="request-score">
                   Eligibility score: {request.score} / {MAX_SUBMISSION_SCORE}
+                  {request.possibleDuplicate && <strong> · Possible duplicate — review the name and location</strong>}
                 </p>
                 <div className="request-facts">
                   <span>
@@ -234,9 +229,7 @@ export function AdminDashboard() {
                   </span>
                 </div>
                 <div className="request-actions">
-                  {request.verificationStatus === "manual_review" && (
-                    <ApprovalActions request={request} onAction={update} />
-                  )}
+                  <ApprovalActions request={request} onAction={update} disabled={busy} />
                   <button
                     type="button"
                     className="button button-secondary button-small"
@@ -245,6 +238,7 @@ export function AdminDashboard() {
                     onClick={() => {
                       setReturnFocusId(`review-${request.id}`);
                       setReviewId(request.id);
+                      setNotes(request.reviewNotes || "");
                     }}
                   >
                     <Eye size={17} />
@@ -262,7 +256,7 @@ export function AdminDashboard() {
                 ? "All caught up."
                 : `No ${statuses[tab].toLowerCase()} requests yet.`}
             </h3>
-            <p>Local submissions and your review decisions will appear here.</p>
+            <p>Submitted Ganapatis and your review decisions will appear here.</p>
             <Link href="/add" className="text-link">
               Share a Ganapati
             </Link>
@@ -312,19 +306,13 @@ export function AdminDashboard() {
             <ScoreBreakdown submission={review} />
             <StoredSubmissionPhotos
               key={`review-photos-${review.id}`}
-              photoSetId={review.photoSetId}
+              paths={review.photos}
               name={review.mandalName}
             />
-            <ListingPhotoEditor
-              key={`photo-editor-${review.id}`}
-              listingId={review.id}
-            />
+            <label className="field-label" htmlFor="review-notes">Internal review notes</label>
+            <textarea id="review-notes" className="input" maxLength={2000} value={notes} disabled={busy} onChange={event => setNotes(event.target.value)} />
             {review.category && <CategoryBadge category={review.category} />}
-            {review.verificationStatus === "manual_review" && (
-              <div className="request-actions">
-                <ApprovalActions request={review} onAction={update} />
-              </div>
-            )}
+            <div className="request-actions"><ApprovalActions request={review} onAction={update} disabled={busy} /></div>
           </>
         )}
       </Modal>
@@ -335,8 +323,10 @@ export function AdminDashboard() {
 function ApprovalActions({
   request,
   onAction,
+  disabled,
 }: {
   request: Submission;
+  disabled: boolean;
   onAction: (id: string, category: PandalCategory | "reject") => void;
 }) {
   return (
@@ -345,7 +335,7 @@ function ApprovalActions({
         type="button"
         className="button button-primary button-small"
         aria-label={`Approve ${request.mandalName || "Untitled submission"} as Featured`}
-        disabled={!request.publicAccess || !request.coordinates}
+        disabled={disabled}
         onClick={() => onAction(request.id, "featured")}
       >
         <Sparkles size={16} />
@@ -355,7 +345,7 @@ function ApprovalActions({
         type="button"
         className="button button-secondary button-small"
         aria-label={`Approve ${request.mandalName || "Untitled submission"} as Community`}
-        disabled={!request.publicAccess || !request.coordinates}
+        disabled={disabled}
         onClick={() => onAction(request.id, "community")}
       >
         <Check size={17} />
@@ -365,6 +355,7 @@ function ApprovalActions({
         type="button"
         className="button button-secondary button-small reject-button"
         aria-label={`Reject ${request.mandalName || "Untitled submission"}`}
+        disabled={disabled}
         onClick={() => onAction(request.id, "reject")}
       >
         <X size={17} />
@@ -388,11 +379,15 @@ function formatCoordinates(point: Submission["coordinates"]) {
     : "Not provided";
 }
 function ScoreBreakdown({ submission }: { submission: Submission }) {
-  const result = evaluateGanapatiSubmission(verificationInput(submission));
+  const result = evaluateGanapatiSubmission({
+    mandalName: submission.mandalName, coordinates: submission.coordinates, submitterName: submission.submitterName,
+    submitterRole: submission.submitterRole, contact: submission.contact, publicAccess: submission.publicAccess,
+    ganapatiPhotoCount: submission.ganapatiImages.count, decorationPhotoCount: submission.decorationImages.count,
+  });
   return (
     <section className="review-score-breakdown">
       <h3>
-        Eligibility Score: {result.totalScore} / {MAX_SUBMISSION_SCORE}
+        Eligibility Score: {submission.score} / {MAX_SUBMISSION_SCORE}
       </h3>
       <dl>
         {(Object.keys(CRITERIA) as (keyof typeof CRITERIA)[]).map((key) => (

@@ -50,6 +50,7 @@ export default defineConfig({
         NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54329",
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test_only",
         NEXT_PUBLIC_SITE_URL: baseURL,
+        GOOGLE_ROUTES_API_KEY: "routes_server_test_only_never_public",
       },
     },
   ],

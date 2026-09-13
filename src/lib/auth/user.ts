@@ -7,9 +7,9 @@ export type ProfileUser = {
   memberSince: string;
 };
 
-export function profileFromUser(user: User): ProfileUser {
+export function profileFromUser(user: User, databaseName?: string): ProfileUser {
   const name =
-    typeof user.user_metadata.full_name === "string"
+    databaseName !== undefined ? databaseName : typeof user.user_metadata.full_name === "string"
       ? user.user_metadata.full_name.trim().slice(0, 80)
       : "";
   const email = user.email ?? "";

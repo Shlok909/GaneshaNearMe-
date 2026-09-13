@@ -2,17 +2,19 @@
 
 import Image from "next/image";
 import type { PhotoPreview } from "@/hooks/useListingPhotos";
-import type { PhotoKind } from "@/lib/local-photos";
+import type { PhotoKind } from "@/lib/types";
 import { photoLabels, photoPlaceholders } from "./ListingPhoto";
 
 export function PhotoThumbnails({
   photos,
   selected,
   onSelect,
+  onError,
 }: {
   photos: Record<PhotoKind, PhotoPreview[]>;
   selected: { kind: PhotoKind; index: number };
   onSelect: (selection: { kind: PhotoKind; index: number }) => void;
+  onError?: () => void;
 }) {
   return (
     <div className="listing-photo-groups">
@@ -55,6 +57,7 @@ export function PhotoThumbnails({
                     fill
                     sizes="100px"
                     unoptimized
+                    onError={items.length ? onError : undefined}
                   />
                 </button>
               ))}

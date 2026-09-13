@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useListingPhotos } from "@/hooks/useListingPhotos";
-import type { PhotoKind } from "@/lib/local-photos";
+import type { PhotoKind, PhotoPaths } from "@/lib/types";
 
 export const photoPlaceholders: Record<PhotoKind, string> = {
   ganapati: "/illustrations/pandal.svg",
@@ -14,17 +14,17 @@ export const photoLabels: Record<PhotoKind, string> = {
 };
 
 export function ListingPhoto({
-  photoSetId,
+  paths,
   name,
   kind = "ganapati",
   sizes,
 }: {
-  photoSetId?: string;
+  paths?: PhotoPaths;
   name: string;
   kind?: PhotoKind;
   sizes: string;
 }) {
-  const photos = useListingPhotos(photoSetId);
+  const photos = useListingPhotos(paths);
   const photo = photos[kind][0];
   return (
     <Image
@@ -37,6 +37,7 @@ export function ListingPhoto({
       fill
       sizes={sizes}
       unoptimized
+      onError={photo ? photos.onError : undefined}
     />
   );
 }

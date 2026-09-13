@@ -42,9 +42,11 @@ export function parseCoordinates(text: string): Coordinates | null {
 export function createGoogleMapsDirectionsUrl({
   origin,
   destination,
+  travelMode,
 }: {
   origin?: Coordinates;
   destination: Coordinates;
+  travelMode?: "driving" | "walking";
 }) {
   if (
     !isValidCoordinates(destination) ||
@@ -56,5 +58,6 @@ export function createGoogleMapsDirectionsUrl({
     destination: `${destination.lat},${destination.lng}`,
   });
   if (origin) params.set("origin", `${origin.lat},${origin.lng}`);
+  if (travelMode) params.set("travelmode", travelMode);
   return `https://www.google.com/maps/dir/?${params.toString()}`;
 }

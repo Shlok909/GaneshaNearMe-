@@ -12,6 +12,7 @@ export function Modal({
   children,
   className,
   returnFocusId,
+  closeLabel = "Close details",
 }: {
   open: boolean;
   onClose: () => void;
@@ -20,6 +21,7 @@ export function Modal({
   children: React.ReactNode;
   className?: string;
   returnFocusId?: string;
+  closeLabel?: string;
 }) {
   return (
     <Dialog.Root
@@ -45,7 +47,7 @@ export function Modal({
           </Dialog.Description>
           <Dialog.Close
             className="modal-close icon-button"
-            aria-label="Close details"
+            aria-label={closeLabel}
           >
             <X size={20} />
           </Dialog.Close>
