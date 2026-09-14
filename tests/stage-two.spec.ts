@@ -299,6 +299,7 @@ test("marker selection, directions, clipboard/native share and unsave preserve p
   await page.locator("#marker-local-fixture-dharampeth").click();
   const sheet = page.getByRole("dialog");
   await expect(sheet).toContainText("Test Dharampeth Cha Raja");
+  await sheet.getByText("Ganapati information", { exact: true }).click();
   const directions = new URL(
     (await sheet
       .getByRole("link", { name: "Get Directions" })

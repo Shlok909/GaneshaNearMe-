@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import {
   LayoutList,
   LocateFixed,
@@ -49,7 +49,6 @@ export function HomeExperience() {
   const [routePandalId, setRoutePandalId] = useState<string | null>(null);
   const [routeRequest, setRouteRequest] = useState(0);
   const [detailsId, setDetailsId] = useState<string | null>(null);
-  const router = useRouter();
   const params = useSearchParams();
   const sorted = useMemo(
     () => withDistances(publicPandals, location.position),
@@ -72,14 +71,13 @@ export function HomeExperience() {
     setDetailsId(null);
     const focused = document.activeElement?.id;
     setReturnFocus(
-      focused?.startsWith("search-result")
+      focused?.startsWith("list-") ? "ganapati-discovery-map" : focused?.startsWith("search-result")
         ? "area-search"
         : focused || "area-search",
     );
     setView("map");
-    router.replace(`/home?pandal=${encodeURIComponent(pandal.id)}`, {
-      scroll: false,
-    });
+    // This is local UI selection; avoid a server/auth round trip for every tap.
+    window.history.replaceState(null, "", `/home?pandal=${encodeURIComponent(pandal.id)}`);
   }
   function startRoute(pandal: Pandal) {
     select(pandal);
@@ -93,12 +91,12 @@ export function HomeExperience() {
   function clearRoute() {
     setRoutePandalId(null);
     setDetailsId(null);
-    router.replace("/home", { scroll: false });
+    window.history.replaceState(null, "", "/home");
   }
   function locate() {
     if (location.status === "requesting") return;
     setView("map");
-    if (selected && !routeTarget) router.replace("/home", { scroll: false });
+    if (selected && !routeTarget) window.history.replaceState(null, "", "/home");
     setLocateRequest((value) => value + 1);
     if (!location.position) {
       if (routeTarget) setRouteRequest(value => value + 1);
@@ -214,7 +212,7 @@ export function HomeExperience() {
           {searchResults.length ? (
             <div className="card-grid">
               {searchResults.map((pandal) => (
-                <PandalCard key={pandal.id} pandal={pandal} />
+                <PandalCard key={pandal.id} pandal={pandal} onSelect={() => select(pandal)} />
               ))}
             </div>
           ) : (
@@ -224,7 +222,8 @@ export function HomeExperience() {
       )}
       <PandalPreviewSheet
         pandal={routeTarget && detailsId !== selected?.id ? null : selected}
-        onClose={() => routeTarget ? setDetailsId(null) : router.replace("/home", { scroll: false })}
+        loading={loading && !!params.get("pandal")}
+        onClose={() => routeTarget ? setDetailsId(null) : window.history.replaceState(null, "", "/home")}
         onShowRoute={selected ? () => startRoute(selected) : undefined}
         returnFocusId={returnFocus}
       />

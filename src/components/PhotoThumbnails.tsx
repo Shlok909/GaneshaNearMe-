@@ -57,6 +57,7 @@ export function PhotoThumbnails({
                     fill
                     sizes="100px"
                     unoptimized
+                    fetchPriority="low"
                     onError={items.length ? onError : undefined}
                   />
                 </button>

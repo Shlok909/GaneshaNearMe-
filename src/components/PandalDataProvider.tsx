@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState } f
 import { createClient } from "@/lib/supabase/client";
 import { readAll, toPandal } from "@/lib/pandal-data";
 import type { Pandal } from "@/lib/types";
+import { ListingPhotoProvider } from "./ListingPhotoProvider";
 
 type DataContext = {
   userId: string; pandals: Pandal[]; ids: string[]; loading: boolean; error: string;
@@ -61,7 +62,7 @@ export function PandalDataProvider({ userId, children }: { userId: string; child
       setIds(savedIds.current);
     } finally { pending.current.delete(id); setPendingIds([...pending.current]); }
   }
-  return <Context.Provider value={{ userId, pandals, ids, loading, error, savesLoading, savesError, pendingIds, refresh, toggle }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ userId, pandals, ids, loading, error, savesLoading, savesError, pendingIds, refresh, toggle }}><ListingPhotoProvider key={userId}>{children}</ListingPhotoProvider></Context.Provider>;
 }
 export function usePandalData() {
   const value = useContext(Context);

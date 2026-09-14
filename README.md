@@ -67,6 +67,10 @@ The server Routes key must not use website/referrer restrictions, which apply to
 
 Routes use real provider paths and stay in memory. While location tracking is active, meaningful movement (at least 100 m or the reported accuracy, whichever is larger) can refresh the route at most once every 30 seconds. **Update route** refreshes immediately. Clear route, stopping location, changing selection and leaving Home remove the old line. Missing permission, API errors, no available route and a 25-second timeout offer recovery and an external Google Maps link; no straight-line substitute is drawn. The blue line is a route preview, not turn-by-turn navigation.
 
+The details popup is a compact, viewport-bounded card: the Ganapati photo appears first, the chevron expands its information, and route/save/share actions remain visible. A logo skeleton covers both URL signing and image loading; failures offer a retry. Ganapati and decoration thumbnails remain separately labeled.
+
+Marker and Home-list selections use Next.js's native history integration to update the shareable URL without a server navigation/auth round trip. Signed photo URLs share in-flight requests and are reused for up to four minutes within the mounted account provider (five-minute provider expiry). The bounded cache is memory-only, clears on sign-out/unmount, and does not bypass Storage permissions. Photo signing has a 15-second deadline; image loading has a 20-second fallback. The main photo has high fetch priority and thumbnails have low priority. Original images can still take longer on slow connections.
+
 The private `pandal-images` bucket permits JPEG/PNG/WebP up to 5 MB each. Two separate arrays preserve Ganapati and decoration placement. Object paths are persisted; signed URLs are generated temporarily and refreshed. There is no client edit of finalized evidence.
 
 Browser geolocation works on localhost when website and operating-system permissions allow it. Chrome/Edge can be used when an embedded preview cannot obtain location. Referrer restrictions and enabled APIs remain managed in Google Cloud.

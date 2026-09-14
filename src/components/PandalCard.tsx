@@ -83,7 +83,14 @@ export function PandalCard({
         <p>{pandal.description}</p>
         <div className="pandal-card-actions">
           <Link
+            id={`list-${pandal.id}`}
             href={`/home?pandal=${pandal.id}`}
+            onClick={onSelect ? event => {
+              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              onSelect();
+            } : undefined}
+            prefetch={onSelect ? false : undefined}
             className="button button-primary button-small"
           >
             View

@@ -27,7 +27,7 @@ test("uploaded bytes stay in the Ganapati and decoration groups after reload and
   expect(record.pandal_image_paths[0]).toContain("/pandal/");
   await page.goto("/home?pandal=" + record.id);
   await readyMap(page);
-  const hero = page.locator(".preview-hero img");
+  const hero = page.locator(".preview-main-photo");
   await expectPhoto(page, hero, ganapatiPhoto);
   await page.getByRole("button", { name: "View Decoration photo 1" }).click();
   await expectPhoto(page, hero, decorationPhoto);
